@@ -1,0 +1,643 @@
+---
+title: "limma-voom for GTEx CeVD"
+author: "Chi-Lam Poon"
+---
+
+```{R set up, include=F}
+library(purrr)
+library(dplyr)
+library(metap)
+library(knitr)
+library(ggplot2)
+library(ggpubr)
+library(Biobase)
+```
+
+#### Load the Rdata filted before
+```{R}
+main_dir <- "/home/ubuntu/storage/cevd"
+eset <- load(file.path(main_dir, "rdata/filted.cevd.rdata"))
+```
+
+### Demography
+
+##### MHCVD 0 & 1 in each tissue
+There are total 6372 samples in the filted dataset, among these 548 had cerebrovascular disease histories (MHCVD = 1) while 5824 didn't (MHCVD = 0).
+
+```{R, fig.height=10, fig.width=10}
+pdata <- pData(filtedSet)
+pdata$MHCVD <- as.factor(pdata$MHCVD)
+
+m_count1 <- pdata %>% group_by(MHCVD) %>% summarise(counts = n())
+m_count1$MHCVD <- as.factor(m_count1$MHCVD)
+
+m_count2 <- pdata %>% group_by(our_subtypes, MHCVD) %>% summarise(counts = n())
+m_count2$MHCVD <- as.factor(m_count2$MHCVD)
+m_count2$our_subtypes <- as.factor(gsub("_", " ", m_count2$our_subtypes))
+
+
+m1 <- ggplot(m_count1, aes(x=MHCVD, y=counts, fill=MHCVD)) + 
+  geom_bar(stat = "identity") + 
+  geom_text(aes(label=counts), vjust = -0.1, size = 3.2) +
+  theme_minimal() + theme(axis.title.x=element_blank()) + 
+  scale_fill_manual(values = c("#1aa398", "#ffb353"))
+
+m2 <- ggplot(m_count2, aes(x=MHCVD, y=counts, fill=MHCVD)) +
+  geom_bar(stat="identity") + 
+  geom_text(aes(label=counts), vjust = 0.5, size = 3.2) + 
+  theme_minimal() +
+  theme(axis.title.x=element_blank(),
+        axis.text.x=element_blank(),
+        axis.title.y=element_blank()) +
+  scale_fill_manual(values = c("#1aa398", "#ffb353")) +
+  facet_wrap(~our_subtypes,ncol=4)
+
+ggarrange(m1, m2, ncol=2, nrow=1, widths=c(1,3), common.legend = T, legend = "right")
+```
+
+
+##### Subject information comparison in gender, AGE, RACE and BMI
+
+```{R}
+# Total subject number
+pdata2 <- pdata %>% select(SUBJID, gender, AGE, RACE, BMI, MHCVD)
+rownames(pdata2) <- seq(1, dim(pdata2)[1])
+pdata2 <- unique(pdata2)
+dim(pdata2)[1]
+table(pdata2$MHCVD)
+```
+Total 444 subjects, and 46 subjects with CeVD histories while 398 without.
+
+##### Age
+
+```{R}
+# Function for T-test
+calculateT <- function(v1, v2){
+  v1 <- as.numeric(v1)
+  v2 <- as.numeric(v2)
+  Ftest <- var.test(v1, v2, alternative = "two.sided")
+  Ttest <- NA
+  ifelse(Ftest$p.value <= 0.05, Ttest <- t.test(v1, v2, paired = F, var.equal = F),
+    Ttest <- t.test(v1, v2, paired = F, var.equal = T))
+  
+  Ttest
+}
+
+# Mean and standard deviation for ages of non-CeVD subjects
+mean(pdata2[pdata2$MHCVD==0, ]$AGE)
+sd(pdata2[pdata2$MHCVD==0, ]$AGE)
+
+# Mean and standard deviation for ages of CeVD subjects
+mean(pdata2[pdata2$MHCVD==1, ]$AGE)
+sd(pdata2[pdata2$MHCVD==1, ]$AGE)
+
+# T-test for ages in two cohorts
+t.age <- calculateT(pdata2[pdata2$MHCVD==0, ]$AGE, pdata2[pdata2$MHCVD==1, ]$AGE)
+t.age
+
+age_sum <- pdata2 %>%
+  select(AGE, MHCVD) %>%
+  group_by(MHCVD) %>%
+  summarise(mean.age = mean(AGE, na.rm = T))
+
+m_a1 <- ggplot(pdata2, aes(AGE, fill=MHCVD)) +
+  geom_histogram(aes(y=..count..), alpha=0.5) +
+  geom_vline(data=age_sum, aes(xintercept=mean.age, colour=MHCVD), lty=2, size=1) +
+  scale_fill_brewer(palette="Set2") +
+  scale_colour_brewer(palette="Set2") +
+  scale_y_continuous(labels=scales::comma) +
+  ylab("Density") +
+  ggtitle(paste0("Age distribution in two cohorts    P-val = ", formatC(t.age$p.value, format="e", digits = 2))) + 
+  labs(x="ages") +
+  theme_minimal() 
+
+m_a2 <- ggplot(pdata2, aes(AGE, fill=MHCVD)) +
+  geom_histogram(aes(y=..density..), alpha=0.5) +
+  geom_density(alpha=.2, aes(colour=MHCVD)) +
+  geom_vline(data=age_sum, aes(xintercept=mean.age, colour=MHCVD), lty=2, size=1) +
+  scale_fill_brewer(palette="Set2") +
+  scale_colour_brewer(palette="Set2") +
+  scale_y_continuous(labels=scales::percent) +
+  ylab("Density") +
+  ggtitle("") + 
+  labs(x="ages") +
+  theme_minimal() 
+
+ggarrange(m_a1, m_a2, ncol=2, nrow=1, common.legend = T, legend = "right")
+```
+
+##### BMI
+
+```{R}
+# Mean and standard deviation for BMIs of non-CeVD subjects
+mean(pdata2[pdata2$MHCVD==0, ]$BMI)
+sd(pdata2[pdata2$MHCVD==0, ]$BMI)
+
+# Mean and standard deviation for BMIs of CeVD subjects
+mean(pdata2[pdata2$MHCVD==1, ]$BMI)
+sd(pdata2[pdata2$MHCVD==1, ]$BMI)
+
+# T-test for BMI in two cohorts
+t.bmi <- calculateT(pdata2[pdata2$MHCVD==0, ]$BMI, pdata2[pdata2$MHCVD==1, ]$BMI)
+t.bmi
+
+bmi_sum <- pdata2 %>%
+  select(BMI, MHCVD) %>%
+  group_by(MHCVD) %>%
+  summarise(mean.bmi = mean(BMI, na.rm = T))
+
+b_a1 <- ggplot(pdata2, aes(BMI, fill=MHCVD)) +
+  geom_histogram(aes(y=..count..), alpha=0.5) +
+  geom_vline(data=bmi_sum, aes(xintercept=mean.bmi, colour=MHCVD), lty=2, size=1) +
+  scale_fill_brewer(palette="Set3") +
+  scale_colour_brewer(palette="Set3") +
+  scale_y_continuous(labels=scales::comma) +
+  ylab("Density") +
+  ggtitle(paste0("BMI distribution in two cohorts    P-val = ", round(t.bmi$p.value, 2))) + 
+  labs(x="BMI") +
+  theme_minimal() 
+
+b_a2 <- ggplot(pdata2, aes(BMI, fill=MHCVD)) +
+  geom_histogram(aes(y=..density..), alpha=0.5) +
+  geom_density(alpha=.2, aes(colour=MHCVD)) +
+  geom_vline(data=bmi_sum, aes(xintercept=mean.bmi, colour=MHCVD), lty=2, size=1) +
+  scale_fill_brewer(palette="Set3") +
+  scale_colour_brewer(palette="Set3") +
+  scale_y_continuous(labels=scales::percent) +
+  ylab("Density") +
+  ggtitle("") + 
+  labs(x="BMI") +
+  theme_minimal() 
+
+ggarrange(b_a1, b_a2, ncol=2, nrow=1, common.legend = T, legend = "right")
+```
+
+##### Gender
+
+```{R}
+table(pdata2[pdata2$MHCVD==1, ]$gender)
+table(pdata2[pdata2$MHCVD==0, ]$gender)
+
+chi.sex <- chisq.test(rbind(table(pdata2[pdata2$MHCVD==1, ]$gender), table(pdata2[pdata2$MHCVD==0, ]$gender)))
+chi.sex
+
+m_g1 <- ggplot(pdata2, aes(gender, fill=MHCVD)) +
+  geom_bar(position="stack") +
+  scale_fill_brewer(palette="Set1") + 
+  scale_y_continuous(labels = scales::comma) +
+  ylab("MHCVD") + 
+  ggtitle(paste0("MHCVD by Sex    P-val = ", round(chi.sex$p.value, 2))) +
+  theme_minimal()
+
+
+m_g2 <- ggplot(pdata2, aes(gender, fill=MHCVD)) +
+  geom_bar(position="fill") +
+  scale_fill_brewer(palette="Set1") + 
+  scale_y_continuous(labels = scales::percent) +
+  ylab("MHCVD Rate") + 
+  ggtitle("") +
+  theme_minimal()
+
+ggarrange(m_g1, m_g2, ncol=2, nrow=1, common.legend = T, legend = "right")
+
+```
+
+##### Race
+
+```{R}
+pdata2$RACE <- as.factor(pdata2$RACE)
+table(pdata2[pdata2$MHCVD==1, ]$RACE)
+table(pdata2[pdata2$MHCVD==0, ]$RACE)
+
+chi.race <- chisq.test(rbind(table(pdata2[pdata2$MHCVD==1, ]$RACE), table(pdata2[pdata2$MHCVD==0, ]$RACE)))
+chi.race
+
+m_r1 <- ggplot(pdata2, aes(RACE, fill=MHCVD)) +
+  geom_bar(position="stack") +
+  scale_fill_brewer(palette="Accent") + 
+  scale_x_discrete(labels = c("Asian", "African", "American", "White", "Unknown")) +
+  scale_y_continuous(labels = scales::comma) +
+  ylab("MHCVD") + 
+  ggtitle(paste0("MHCVD by Race    P-val = ", round(chi.race$p.value, 2))) +
+  theme_minimal() + theme(axis.text.x = element_text(angle = 55, hjust = 1, size = 8.5))
+
+
+m_r2 <- ggplot(pdata2, aes(RACE, fill=MHCVD)) +
+  geom_bar(position="fill") +
+  scale_fill_brewer(palette="Accent") + 
+    scale_x_discrete(labels = c("Asian", "African", "American", "White", "Unknown")) +
+  scale_y_continuous(labels = scales::percent) +
+  ylab("MHCVD Rate") + 
+  ggtitle("") +
+  theme_minimal() + theme(axis.text.x = element_text(angle = 55, hjust = 1, size = 8.5))
+
+ggarrange(m_r1, m_r2, ncol=2, nrow=1, common.legend = T, legend = "right")
+
+```
+
+##### Tissues in Brian-0,1,2
+
+```{R}
+for(i in c("brain-0", "brain-1", "brain-2")){
+  brain_sum <- pdata %>% filter(our_subtypes==i) %>%
+    select(SAMPID, SMTSD, MHCVD) %>%
+    group_by(SMTSD, MHCVD) %>%
+    summarise(n = n()) 
+
+  print(kable(brain_sum, caption="tissues in cluster", format="markdown"))
+  
+}
+
+```
+
+### Differential Expression Analysis
+
+Differential expression (DE) analysis between CeVD and non-CeVD samples was conducted using the voom-limma pipeline. We first conducted DE analyses on three brain clusters, then on other tissues.
+
+For **brain clusters**, gene expression was modelled using a linear regression formula with blocking, which is due to multiple and various tissue sites in a cluster:
+
+$$Y \sim \beta_1Sex + \beta_2Age + \beta_3BMI + \beta_4Hardy + \beta_5Batch + \beta_6MHCVD + \beta_7PC1_g + \beta_8PC2_g + \beta_9PC3_g + \beta_{10}Site + \mu_1Subject + \epsilon$$
+
+```{R}
+table_dir <- file.path(main_dir, "results/limma.tables")
+plot_dir <- file.path(main_dir, "results/limma.plots")
+
+exprs <- exprs(filtedSet)
+clusters <- c("brain-0", "brain-1", "brain-2")
+tissues <- unique(as.character(pdata$our_subtypes))
+tissues <- tissues[!tissues %in% grep("brain", tissues, value = T)]
+disease <- "cvd1"
+```
+
+
+```{R, eval=F}
+source("/home/rstudio/cevd/utils.R")
+for(c in clusters){
+  print(c)
+  
+  # Subset phenotype and expression data
+  sub_pdata <- pdata[pdata$our_subtypes==c, ]
+  sub_exprs <- exprs[, which(colnames(exprs) %in% sub_pdata$SAMPID)]
+
+  # Construct the linear model
+  print("Running limma pipeline...")
+  age    <- sub_pdata$AGE
+  bmi    <- sub_pdata$BMI
+  gender <- sub_pdata$gender
+  batch  <- sub_pdata$SMNABTCHT
+  cvd    <- factor(sub_pdata$MHCVD)
+  race   <- factor(as.character(sub_pdata$RACE))
+  subject<- sub_pdata$SUBJID
+  hardy  <- factor(as.character(sub_pdata$DTHHRDY))
+  site   <- as.character(sub_pdata$SMTSD)
+  PC1    <- sub_pdata$C1
+  PC2    <- sub_pdata$C2
+  PC3    <- sub_pdata$C3
+  design = model.matrix(~  age + bmi + gender + batch + cvd + race + site + hardy + PC1 + PC2 + PC3)  
+  
+  # Use voom weighting
+  transformedCounts <- sub_exprs
+  voomOutput <- voomWeightsCustomized(transformedCounts, design)
+  
+  # Blocking
+  corfit <- duplicateCorrelation(voomOutput, design, block = subject)
+  print('Consensus correlation:')
+  print(corfit$consensus.correlation)
+  fit <- lmFit(voomOutput, design, block = subject, correlation = corfit$consensus.correlation)
+  fit <- eBayes(fit)
+  gl <- fData(filtedSet)$geneNames
+  tt <- topTable(fit, number=Inf, genelist=gl, coef=disease)
+  
+  # Output reports & plots
+  write.table(tt, file=sprintf("%s/%s.tsv", table_dir, c), sep="\t", quote=F)
+  pdf(sprintf("%s/%s.volcanoplot.pdf", plot_dir, c))
+  limma::volcanoplot(fit, coef=disease, highlight = 6, names = gl, main = c)
+  dev.off()
+  pdf(sprintf("%s/%s.MAplot.pdf", plot_dir, c))
+  limma::plotMA(fit, main = c)
+  dev.off()
+}
+
+# [1] "brain-0"
+# [1] "Running limma pipeline..."
+# NaNs produced
+# [1] "Consensus correlation:"
+# [1] 0.2435535
+# [1] "brain-1"
+# [1] "Running limma pipeline..."
+# [1] "Consensus correlation:"
+# [1] 0.4114889
+# [1] "brain-2"
+# [1] "Running limma pipeline..."
+# [1] "Consensus correlation:"
+# [1] 0.368475
+
+```
+
+For **other tissues**, gene expression was modelled using the following linear regression formula:
+
+$$Y \sim \beta_1Sex + \beta_2Age + \beta_3BMI + \beta_4Hardy + \beta_5Batch + \beta_6MHCVD + \beta_7PC1_g + \beta_8PC2_g + \beta_9PC3_g + \epsilon$$
+Only tissues with more than 10 or 15 CeVD samples should be used in DE analyses, but here just using all.
+
+```{R, eval=F}
+tissues <- unique(as.character(pdata$our_subtypes))
+tissues <- tissues[!tissues %in% grep("brain", tissues, value = T)]
+
+for(tissue in tissues){
+  print(tissue)
+  
+  # Subset phenotype and expression data
+  sub_pdata <- pdata[pdata$our_subtypes==tissue, ]
+  sub_exprs <- exprs[, which(colnames(exprs) %in% sub_pdata$SAMPID)]
+
+  # Construct the linear model
+  print("Running limma pipeline...")
+  age    <- sub_pdata$AGE
+  bmi    <- sub_pdata$BMI
+  gender <- sub_pdata$gender
+  batch  <- sub_pdata$SMNABTCHT
+  cvd    <- factor(sub_pdata$MHCVD)
+  race   <- factor(as.character(sub_pdata$RACE))
+  hardy  <- factor(as.character(sub_pdata$DTHHRDY))
+  PC1    <- sub_pdata$C1
+  PC2    <- sub_pdata$C2
+  PC3    <- sub_pdata$C3
+  design = model.matrix(~  age + bmi + gender + batch + cvd + race + hardy + PC1 + PC2 + PC3)  
+  
+  # Use voom weighting
+  transformedCounts <- sub_exprs
+  voomOutput <- voomWeightsCustomized(transformedCounts, design)
+  fit <- lmFit(voomOutput, design)
+  fit <- eBayes(fit)
+  gl <- fData(filtedSet)$geneNames
+  tt <- topTable(fit, number=Inf, genelist=gl, coef=disease)
+  
+  # Output reports & plots
+  write.table(tt, file=sprintf("%s/%s.tsv", table_dir, tissue), sep="\t", quote=F)
+  pdf(sprintf("%s/%s.volcanoplot.pdf", plot_dir, tissue))
+    limma::volcanoplot(fit, coef=disease, highlight = 6, names = gl, main = tissue)
+  dev.off()
+  pdf(sprintf("%s/%s.MAplot.pdf", plot_dir, tissue))
+    limma::plotMA(fit, main = tissue)
+  dev.off()
+}
+
+```
+
+##### DEG amounts in each tissue or cluster
+```{R, fig.height=8}
+all_type <- c(clusters, tissues)
+# A function to plot DEG numbers for all tissues
+count_DEG <- function(table_dir, all_type){
+  sig_count <- c()
+  for(i in all_type){
+    tempt <- read.table(file.path(table_dir, paste0(i, ".tsv")), sep="\t", header=T)
+    sig_count <- c(sig_count, nrow(tempt[tempt$adj.P.Val < 0.1 & abs(tempt$logFC) > log2(1.5), ]))
+  }
+  
+  sc_df <- data.frame(type = all_type, count = sig_count)
+  
+  ggplot(data=sc_df, aes(x=type, y=count)) +
+    geom_bar(stat="identity", fill="skyblue", color="black") +
+    scale_x_discrete(limits=rev(sc_df$type), labels=rev(gsub("_", " ", sc_df$type))) +
+    scale_y_continuous(limits=c(0,1200), expand = c(0.02,0)) +
+    geom_text(aes(label=count), vjust=0.25, hjust=-0.3, size=2.7) +
+    labs(title="DEGs amounts", x="", y="") +
+    coord_flip() + theme_bw()
+}
+
+count_DEG(table_dir, all_type)
+
+```
+
+#### Rank the genes in three brain clusters
+
+For brain clusters, genes from limma reports were ranked by calculating the combined Q-value from the adjusted P-values in three clusters using Fisher’s method, finding the common set of genes which share similar expression patterns across brain regions.
+
+```{R}
+btt0 <- read.table(file.path(table_dir, "brain-0.tsv"), sep="\t", header=T)
+btt1 <- read.table(file.path(table_dir, "brain-1.tsv"), sep="\t", header=T)
+btt2 <- read.table(file.path(table_dir, "brain-2.tsv"), sep="\t", header=T)
+
+btt0$esID <- rownames(btt0)
+btt1$esID <- rownames(btt1)
+btt2$esID <- rownames(btt2)
+# Merge three adjusted p-vals
+cb_df <- list(btt0[, c("esID", "ID", "adj.P.Val")], btt1[, c("esID",  "adj.P.Val")], btt2[, c("esID",  "adj.P.Val")]) %>% reduce(left_join, by="esID")
+
+# Compute combined q-val and sort
+cb_df$fisherQ <- sapply(seq_along(cb_df$esID), function(x) sumlog(c(cb_df$adj.P.Val.x[x], cb_df$adj.P.Val.y[x], cb_df$adj.P.Val[x]))$p)
+cb_df <- cb_df[order(cb_df$fisherQ), ]
+head(cb_df, 20)
+
+# Save 
+write.table(cb_df, file.path(main_dir, "results/combined.brains.txt"), sep="\t", col.names = F, row.names = T, quote = F)
+```
+
+The scatter plot of t-statistics from three clusters. Colors represent negative logarithm of combined Fisher’s q-values for each gene.
+
+```{python, eval=F}
+
+from mpl_toolkits.mplot3d import Axes3D
+import matplotlib.pyplot as plt
+import numpy as np
+import math
+import pylab
+from mpl_toolkits.mplot3d import proj3d
+from matplotlib import ticker
+
+genes = []
+brain0t = xs = []
+brain1t = ys = []
+brain2t = zs = []
+combq = []
+
+#Extract columns
+with open('/Users/kimdissi/GoogleDrive/my.cevd/limma.tables/combined.qval.txt') as f:
+    next(f) #pass header
+    lines = f.readlines()
+
+    for x in lines:
+        genes.append(x.split("\t")[1])
+        brain0t.append(float(x.split("\t")[4]))
+        brain1t.append(float(x.split("\t")[10]))
+        brain2t.append(float(x.split("\t")[16]))
+        combq.append(-math.log10(float(x.split("\t")[20])))
+
+
+#plot
+fig = plt.figure()
+ax = fig.add_subplot(111,projection='3d')
+p = ax.scatter(xs,ys,zs,c=combq, cmap = 'viridis_r')
+
+#grid colors
+plt.rcParams['grid.color'] = '#f0f0f0'
+plt.rcParams['grid.linewidth'] = 2
+
+#axis labels
+ax.set_xlabel('Brain0-t')
+ax.set_ylabel('Brain1-t')
+ax.set_zlabel('Brain2-t')
+
+#colors of planes
+ax.w_xaxis.set_pane_color((1.0, 1.0, 1.0, 1.0))
+ax.w_yaxis.set_pane_color((1.0, 1.0, 1.0, 1.0))
+ax.w_zaxis.set_pane_color((1.0, 1.0, 1.0, 1.0))
+
+#colorbar
+p.set_clim([0,round(max(combq))])
+cbar = fig.colorbar(p, ax=ax,shrink = 0.8, ticks = np.arange(0,round(max(combq))+1))
+cbar.set_label('-log(q)')
+cbar.outline.set_visible(False)
+
+#Add annotations
+
+global labels_and_points
+labels_and_points = []
+
+# Write the lables u want to add
+labels = []
+xa = []
+ya = []
+za = []
+for i in range(4):
+    labels.append(genes[i])
+    xa.append(xs[i])
+    ya.append(ys[i])
+    za.append(zs[i])
+
+
+old_x = old_y = 1e9
+thresh = .1
+
+for txt, x, y, z in zip(labels, xa, ya, za):
+    x2, y2, _ = proj3d.proj_transform(x,y,z, ax.get_proj())
+
+    d = ((x2-old_x)**2+(y2-old_y)**2)**(.5)
+    flip = 1
+    if d < thresh: flip=-1.6
+
+    label = plt.annotate(
+        txt, xy = (x2, y2), xytext = (-20*flip, 20*flip), size = 8,
+        textcoords = 'offset points', ha = 'right', va = 'bottom',
+        bbox = dict(boxstyle = 'round,pad=0.25', fc = 'orange', alpha = 0.5),
+        arrowprops = dict(arrowstyle = '-|>', connectionstyle = 'arc3,rad=0'))
+    labels_and_points.append((label, x, y, z))
+    old_x = x2
+    old_y = y2
+
+# RCC1 or any else genes you want to add
+#xr = xs[genes.index('RCC1')]
+#yr = ys[genes.index('RCC1')]
+#zr = zs[genes.index('RCC1')]
+#x3, y3, _ = proj3d.proj_transform(xr,yr,zr, ax.get_proj())
+#label_r = plt.annotate(
+#    'RCC1', xy = (x3, y3), xytext = (15, 26), size = 8,
+#    textcoords = 'offset points', ha = 'right', va = 'bottom',
+#    bbox = dict(boxstyle = 'round,pad=0.25', fc = 'orange', alpha = 0.5),
+#    arrowprops = dict(arrowstyle = '-|>', connectionstyle = 'arc3,rad=0'))
+#labels_and_points.append((label_r, xr, yr, zr))
+
+
+def update_position(e):
+    for label, x, y, z in labels_and_points:
+        x2, y2, _ = proj3d.proj_transform(x, y, z, ax.get_proj())
+        label.xy = x2,y2
+        label.update_positions(fig.canvas.renderer)
+    fig.canvas.draw()
+
+fig.canvas.mpl_connect('motion_notify_event', update_position)
+plt.savefig('/Users/kimdissi/GoogleDrive/my.cevd/limma.plots/3Dscatterplot.pdf',format = 'pdf')
+
+
+```
+
+
+#### Box plots of gene expression
+
+Boxplots for brain transcriptomes, the left one is the overall expression level in all brain tissues (including 3 clusters), the right facet plots are expression level in each single cluster.
+```{R, fig.height=7, fig.width=9}
+# Boxplot for gene expression level comparison in overall or tissue-specific way.
+
+brain_box <- function(countsMat, cb_df, phenoDF, esid, clusters){
+  
+  t_pdata <- phenoDF %>% select("SAMPID", "our_subtypes", "MHCVD") %>% filter(our_subtypes %in% clusters)
+  exp_list <- as.data.frame(countsMat[esid, which(colnames(countsMat) %in% t_pdata$SAMPID)])
+  exp_list$SAMPID <- rownames(exp_list)
+  colnames(exp_list) <- c("counts", "SAMPID")
+  mdf <- merge(exp_list, t_pdata, by="SAMPID")
+  mdf$MHCVD <- factor(mdf$MHCVD)
+  symbol <- as.character(cb_df[cb_df$esID==esid, ]$ID)
+  q_val <- cb_df[cb_df$esID==esid, ]$fisherQ
+  
+  p1 <- ggplot(data=mdf, aes(x=MHCVD, y=counts)) + 
+    geom_boxplot(aes(fill=MHCVD))  + 
+    scale_fill_manual(values = c("steelblue2", "wheat1")) + # box fill color
+    labs(title=symbol, x="", y="qsmooth counts") + guides(fill=F) +
+    theme_bw()
+  
+  p2 <- ggboxplot(mdf, x="MHCVD", y="counts",
+                 color="MHCVD", palette="jco", main=paste0("Combined q-val = ", formatC(q_val, format="e", digits=2)),
+                 xlab="", ylab="", add="jitter") +
+      theme_bw() +
+      theme(strip.background = element_rect(colour = "black", fill = "white")) +
+      facet_wrap(~our_subtypes)  + 
+      stat_compare_means() # wilcoxon rank sum test
+  
+  ggarrange(p1, p2, ncol=2, nrow=1, widths=c(1,3))
+}
+
+# FCGBP
+brain_box(exprs, cb_df, pdata, "ENSG00000090920.9", clusters)
+
+# ANKRD37 
+brain_box(exprs, cb_df, pdata, "ENSG00000186352.4", clusters)
+
+# BEND3 
+brain_box(exprs, cb_df, pdata, "ENSG00000178409.9", clusters)
+
+# STAB1 
+brain_box(exprs, cb_df, pdata, "ENSG00000010327.6", clusters)
+
+# RP11-284F21.9 
+brain_box(exprs, cb_df, pdata, "ENSG00000272068.1", clusters)
+
+```
+
+#### DEGs in heart atrial appendage
+
+Since there are over 1,000 DEGs found in heart atrial appendage, it's worth having a deeper look at these genes.
+But how to prove that these are not due to the unbalanced cohort numbers...?
+```{R, fig.width=4}
+aa_tt <- read.table(file.path(table_dir, "heart_atrial_appendage.tsv"), sep="\t", header=T)
+head(aa_tt, 20)
+
+# Function to draw the boxplot for a single gene in one tissue
+single_box <- function(countsMat, phenoDF, esid, tissue){
+  # Load the top table of this tissue
+  tt <- read.table(sprintf("%s/%s.tsv", table_dir, tissue), sep="\t", header=T)
+  
+  t_pdata <- phenoDF %>% filter(our_subtypes == tissue) %>% select("SAMPID", "MHCVD") 
+  exp_list <- as.data.frame(countsMat[esid, which(colnames(countsMat) %in% t_pdata$SAMPID)])
+  exp_list$SAMPID <- rownames(exp_list)
+  colnames(exp_list) <- c("counts", "SAMPID")
+  mdf <- merge(exp_list, t_pdata, by="SAMPID")
+  mdf$MHCVD <- factor(mdf$MHCVD)
+  symbol <- as.character(tt[esid, ]$ID)
+  q_val <- tt[esid, ]$adj.P.Val
+  
+  ggboxplot(mdf, x="MHCVD", y="counts",
+           color="MHCVD", palette="jco", main=paste0(symbol, "  q-val = ", formatC(q_val, format="e", digits=2)),
+           xlab=tissue, ylab="qsmooth counts", add="jitter", ggtheme = theme_bw())
+  
+}
+
+single_box(exprs, pdata, "ENSG00000151117.4", "heart_atrial_appendage")
+
+single_box(exprs, pdata, "ENSG00000231769.2", "heart_atrial_appendage")
+
+single_box(exprs, pdata, "ENSG00000004534.10", "heart_atrial_appendage")
+
+```
+
+
