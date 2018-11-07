@@ -1,0 +1,154 @@
+---
+title: "Filtering"
+author: "Chi-Lam Poon"
+---
+
+```{R set up, include=F}
+library(dplyr)
+library(knitr)
+library(ggplot2)
+library(ggpubr)
+library(Biobase)
+```
+
+####Files: 
+
+Processed rdata: `gtex_sub.rdata`
+
+PC file: `GTEx_Analysis_2015-01-12_OMNI_2.5M_5M_450Indiv_PostImput_20genotPCs.txt`
+
+Phenotype file: `p1.c1.GTEx_Subject_Phenotypes.GRU.txt`
+
+The `obj3@phenoData` in this rdata is modified from file `p1.c1.GTEx_Sample_Attributes.GRU.txt`, need to add the MHCVD column in it, from `p1.c1.GTEx_Subject_Phenotypes.GRU.txt`.
+
+#### Load data 
+```{R, eval=T}
+main_dir <- "/home/ubuntu/storage/cevd"
+eset <- load(file.path(main_dir, "rdata/gtex_sub.rdata"))
+pheno <- read.delim(file.path(main_dir, "pheno/p1.c1.GTEx_Subject_Phenotypes.GRU.txt"), comment.char = "#")
+```
+
+This dataset was filtered and normalized using package **Yet Another RNA Normalization pipeline** (YARN), containing 30,333 genes and 9,435 samples.
+
+In YARN, the GTEx tissues were clustered into:
+```{R, fig.height=8}
+t_count <- obj3@phenoData@data %>%
+  group_by(our_subtypes) %>%
+  summarise(counts=n())
+t_count$our_subtypes <- as.factor(gsub("_", " ", t_count$our_subtypes))
+
+ggplot(t_count, aes(x=our_subtypes, y=counts)) +
+  geom_bar(stat = "identity", fill = "tomato", color="black") + 
+  scale_x_discrete(limits=rev(levels(t_count$our_subtypes))) +
+  scale_y_continuous(limits=c(0,820), expand = c(0.02,0)) +
+  geom_text(aes(label= counts), vjust=0.32, hjust=-0.25, size=2.7) + coord_flip() +
+  labs(title="Sample numbers in each cluster before filtering", x="", y="sample #") +
+  theme_bw()
+
+```
+
+#### Filter and add annotations
+
+1. In GTEx, `MHCVD` was recorded as value `0 (No)`, `1 (Yes)` and `99 (Unknown)`, therefore subjects with 0 or 1 were kept.
+
+2. Remove samples with NA hardy scale (`DTHHRDY`).
+
+3. Since genotype principal components (PCs) were included in the design formula, subjects without genotype data were filterd out. 
+
+4. Moreover, the suboptimal samples, those with `FLAGGED` in the `SMTORMVE` field, were removed. 
+
+5. Exclude following sex-specific tissues: 
+
+- cells_ebv-transformed_lymphocytes
+- cells_transformed_fibroblasts
+- ovary
+- prostate
+- testis
+- uterus
+- vagina
+
+```{R}
+# Add MHCVD and DTHHRDY columns
+ori_pheno <- pData(obj3)
+identical(ori_pheno$ids, ori_pheno$SUBJID) #TRUE
+pdata <- merge(ori_pheno[, !names(ori_pheno) %in% c("ids")], pheno[, c("SUBJID", "DTHHRDY", "MHCVD")], by="SUBJID")
+dim(pdata)
+table(pdata$MHCVD)
+table(pdata$DTHHRDY)
+
+pc_file <- read.delim("/home/ubuntu/storage/cevd/pheno/GTEx_Analysis_2015-01-12_OMNI_2.5M_5M_450Indiv_PostImput_20genotPCs.txt")
+identical(pc_file$FID, pc_file$IID)
+pc_subjID <- unique(gsub("-....-..-.*$", "", pc_file$FID))
+pc_file$SUBJID <- pc_subjID
+
+table(pdata$SMTORMVE)
+sum(is.na(pdata$SMTORMVE))
+
+ex_tissues <- c("cells_ebv-transformed_lymphocytes", "cells_transformed_fibroblasts", "ovary",
+                "prostate", "testis", "uterus", "vagina")
+
+# Filtering
+pdata <- pdata %>% filter((MHCVD %in% c(0, 1)) & (SUBJID %in% pc_subjID) & (is.na(DTHHRDY) == F) &
+                            (is.na(SMTORMVE) == T) & (!our_subtypes %in% ex_tissues))
+
+# Add PC1~3 to pdata
+pdata <- merge(pdata, pc_file[,c(3,4,5,ncol(pc_file))], by="SUBJID")
+dim(pdata)
+```
+
+
+```{R, fig.height=8}
+# Demography
+t_count2 <- pdata %>%
+  group_by(our_subtypes) %>%
+  summarise(counts=n())
+t_count2$our_subtypes <- as.factor(gsub("_", " ", t_count2$our_subtypes))
+
+# Sample numbers in each tissue
+ggplot(t_count2, aes(x=our_subtypes, y=counts)) +
+  geom_bar(stat = "identity", fill = "gold", color="black") + 
+  scale_x_discrete(limits=rev(levels(t_count2$our_subtypes))) +
+  scale_y_continuous(limits=c(0,620), expand = c(0.02,0)) +
+  geom_text(aes(label= counts), vjust=0.32, hjust=-0.25, size=2.7) + coord_flip() +
+  labs(title="Sample numbers in each cluster after filtering", x="", y="sample #") +
+  theme_bw()
+```
+There were total 6295 samples left after filtering.
+
+
+#### Subset the filtered samples' qsmooth data and save
+
+```{R, eval=T}
+edata <- assayData(obj3)[["qsmooth"]]
+dim(edata)
+edata <- edata[, -which(!colnames(edata) %in% pdata$SAMPID)]
+dim(edata)
+
+experimentData <- new("MIAME",
+                      name = "Chilam",
+                      lab="Joey Chen Lab",
+                      contact="",
+                      title="GTEx CVD",
+                      abstract="",
+                      url="")
+
+# Reorder the pheno dataframe by qsmooth's colnames
+rownames(pdata) <- pdata$SAMPID
+pdata <- pdata[colnames(edata), ]
+metadata <- data.frame(labelDescription = rep(NA, ncol(pdata)),
+                       row.names = colnames(pdata))
+phenoData <- new("AnnotatedDataFrame", data=pdata, varMetadata=metadata)
+
+# Create a new expression set and save
+filtedSet <- ExpressionSet(assayData = edata,
+                           phenoData = phenoData,
+                           experimentData = experimentData,
+                           featureData = obj3@featureData)
+
+# Save
+save(filtedSet, file=file.path(main_dir, "rdata/filted.cevd.rdata"))
+```
+
+
+
+
