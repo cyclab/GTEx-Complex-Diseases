@@ -1,6 +1,5 @@
 ---
 title: "Filtering"
-author: "Chi-Lam Poon"
 ---
 
 ```{R set up, include=F}
