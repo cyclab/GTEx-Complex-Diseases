@@ -17,19 +17,22 @@ JarFile=${HOME}/gsea-3.0.jar
 #costumed.gmt # GWAS + drugbank
 
 ## Outer loop for different gmt files; Inner loop for different tissues
-while read g; do
-  GmtFile=${GMT}/costumed.gmt
-  mkdir ${OUTPUT}/${g}
-  while read t; do
-    RnkFile=${RNK}/"${t}".rnk
-    OutFile=${OUTPUT}/${g}
+while read t; do
+  mkdir ${OUTPUT}/${t}
+
+  while read g; do
+    GmtFile=${GMT}/${g}
+    RnkFile=${RNK}/${t}.rnk
+
+    mkdir ${OUTPUT}/${t}/${g}
+    OutFile=${OUTPUT}/${t}/${g}
     java -cp ${JarFile} -Xmx8192m xtools.gsea.GseaPreranked -gmx ${GmtFile} -rnk ${RnkFile} -out ${OutFile} -norm meandiv -nperm 1000 -scoring_scheme weighted
-    echo Finish "${t}"!
-  done < tissue.names.txt
-  echo Finish all ${g}!!
+    echo Finish ${g}!
+  done < gmt.list
 
-done < gmt.list
+  echo Finish all ${t}!!
+done < tissue.names.txt
 
-echo Finish allll
+echo Finish allllll
 
 # Run this script: ./run.prerank.sh > gsea.prerank.log
