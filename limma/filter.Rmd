@@ -148,6 +148,3 @@ filtedSet <- ExpressionSet(assayData = edata,
 save(filtedSet, file=file.path(main_dir, "rdata/filted.cevd.rdata"))
 ```
 
-
-
-
