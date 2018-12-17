@@ -14,7 +14,7 @@ JarFile=${HOME}/gsea-3.0.jar
 #c5.all.v6.2.symbols.gmt
 #DO.gmt #DO
 #hpo.gmt
-#costumed.gmt # GWAS + drugbank
+#customed.gmt # GWAS + drugbank
 
 ## Outer loop for different gmt files; Inner loop for different tissues
 while read t; do
