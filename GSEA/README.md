@@ -9,9 +9,9 @@ javaGSEA: `gsea-3.0.jar`
 
 **MsigDB:**
 
-All GO gene sets, Entrez IDs: `c5.all.v6.2.symbols.gmt`
+All GO gene sets, gene symbols: `c5.all.v6.2.symbols.gmt`
 
-GO biological processes, Entrez IDs: `c5.bp.v6.2.entrez.gmt`
+GO biological processes, gene symbols: `c5.bp.v6.2.symbols.gmt`
 
 Disease Ontology: `do.gmt`
 
