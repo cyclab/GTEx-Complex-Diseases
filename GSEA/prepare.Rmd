@@ -20,13 +20,22 @@ ls | sed 's/.tsv//g' > tissue.list
 while read t; do cat $t.tsv | cut -f 2,5 | sed '1d' > ../../../gsea/rnk/$t.rnk; done < tissue.list
 
 cd /home/ubuntu/hdd/gsea/gmt
-rename 's/-/_/g' brain*.rnk # remove dash for file names
 ls > ../gmt.list
 
 cd /home/ubuntu/hdd/gsea/gmt/rnk
+rename 's/-/_/g' brain*.rnk # remove dash for file names
 ls | sed 's/.rnk//g' > ../tissue.names.txt
 ```
 
+Only following tissues were chosen:
+
+- Brain-0
+- Brain-1
+- Brain-2
+- Artery tibial
+- Heart atrial appendage
+- Minor salivary gland
+- Muscle skeletal
 
 ### Functional enrichment analysis: perform pre-ranked GSEA 
 Pre-ranked GSEA was conducted on gene lists ranked by the t-statistics from the results of DE analysis.
@@ -69,5 +78,3 @@ c5.bp.v6.2.symbols.gmt
 ##### Run Java program
 
 `./run.prerank.sh > gsea.prerank.log`
-
-
