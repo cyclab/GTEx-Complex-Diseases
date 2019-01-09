@@ -4,7 +4,7 @@ author: "Chi-Lam Poon"
 output: html_document
 ---
 
-```{R set up, include=F}
+```{R set up, include=T}
 suppressPackageStartupMessages({
   library(purrr)
   library(dplyr)
@@ -35,11 +35,13 @@ m_count1$MHCVD <- as.factor(m_count1$MHCVD)
 m_count2 <- pdata %>% group_by(our_subtypes, MHCVD) %>% summarise(counts = n())
 m_count2$MHCVD <- as.factor(m_count2$MHCVD)
 m_count2$our_subtypes <- as.factor(gsub("_", " ", m_count2$our_subtypes))
+
 m1 <- ggplot(m_count1, aes(x=MHCVD, y=counts, fill=MHCVD)) + 
   geom_bar(stat = "identity") + 
   geom_text(aes(label=counts), vjust = -0.1, size = 3.2) +
   theme_minimal() + theme(axis.title.x=element_blank()) + 
   scale_fill_manual(values = c("#1aa398", "#ffb353"))
+
 m2 <- ggplot(m_count2, aes(x=MHCVD, y=counts, fill=MHCVD)) +
   geom_bar(stat="identity") + 
   geom_text(aes(label=counts), vjust = 0.5, size = 3.2) + 
@@ -49,6 +51,7 @@ m2 <- ggplot(m_count2, aes(x=MHCVD, y=counts, fill=MHCVD)) +
         axis.title.y=element_blank()) +
   scale_fill_manual(values = c("#1aa398", "#ffb353")) +
   facet_wrap(~our_subtypes,ncol=4)
+
 ggarrange(m1, m2, ncol=2, nrow=1, widths=c(1,3), common.legend = T, legend = "right")
 ```
 
@@ -79,6 +82,7 @@ calculateT <- function(v1, v2){
   
   Ttest
 }
+
 # Mean and standard deviation for ages of non-CeVD subjects
 mean(pdata2[pdata2$MHCVD==0, ]$AGE)
 sd(pdata2[pdata2$MHCVD==0, ]$AGE)
@@ -170,6 +174,7 @@ m_g1 <- ggplot(pdata2, aes(gender, fill=MHCVD)) +
   ylab("MHCVD") + 
   ggtitle(paste0("MHCVD by Sex    P-val = ", round(chi.sex$p.value, 2))) +
   theme_minimal()
+
 m_g2 <- ggplot(pdata2, aes(gender, fill=MHCVD)) +
   geom_bar(position="fill") +
   scale_fill_brewer(palette="Set1") + 
@@ -177,6 +182,7 @@ m_g2 <- ggplot(pdata2, aes(gender, fill=MHCVD)) +
   ylab("MHCVD Rate") + 
   ggtitle("") +
   theme_minimal()
+
 ggarrange(m_g1, m_g2, ncol=2, nrow=1, common.legend = T, legend = "right")
 ```
 
@@ -188,6 +194,7 @@ table(pdata2[pdata2$MHCVD==1, ]$RACE)
 table(pdata2[pdata2$MHCVD==0, ]$RACE)
 chi.race <- chisq.test(rbind(table(pdata2[pdata2$MHCVD==1, ]$RACE), table(pdata2[pdata2$MHCVD==0, ]$RACE)))
 chi.race
+
 m_r1 <- ggplot(pdata2, aes(RACE, fill=MHCVD)) +
   geom_bar(position="stack") +
   scale_fill_brewer(palette="Accent") + 
@@ -196,6 +203,7 @@ m_r1 <- ggplot(pdata2, aes(RACE, fill=MHCVD)) +
   ylab("MHCVD") + 
   ggtitle(paste0("MHCVD by Race    P-val = ", round(chi.race$p.value, 2))) +
   theme_minimal() + theme(axis.text.x = element_text(angle = 55, hjust = 1, size = 8.5))
+
 m_r2 <- ggplot(pdata2, aes(RACE, fill=MHCVD)) +
   geom_bar(position="fill") +
   scale_fill_brewer(palette="Accent") + 
@@ -204,6 +212,7 @@ m_r2 <- ggplot(pdata2, aes(RACE, fill=MHCVD)) +
   ylab("MHCVD Rate") + 
   ggtitle("") +
   theme_minimal() + theme(axis.text.x = element_text(angle = 55, hjust = 1, size = 8.5))
+
 ggarrange(m_r1, m_r2, ncol=2, nrow=1, common.legend = T, legend = "right")
 ```
 
@@ -216,7 +225,6 @@ for(i in c("brain-0", "brain-1", "brain-2")){
     group_by(SMTSD, MHCVD) %>%
     summarise(n = n()) 
   print(kable(brain_sum, caption="tissues in cluster", format="markdown"))
-  
 }
 ```
 
@@ -239,7 +247,7 @@ disease <- "cvd1"
 ```
 
 
-```{R, eval=F}
+```{R, eval=T}
 source("/home/rstudio/cevd/utils.R")
 for(c in clusters){
   print(c)
@@ -254,14 +262,14 @@ for(c in clusters){
   gender <- sub_pdata$gender
   batch  <- sub_pdata$SMNABTCHT
   cvd    <- factor(sub_pdata$MHCVD)
-  race   <- factor(as.character(sub_pdata$RACE))
+  #race   <- factor(as.character(sub_pdata$RACE))
   subject<- sub_pdata$SUBJID
   hardy  <- factor(as.character(sub_pdata$DTHHRDY))
   site   <- as.character(sub_pdata$SMTSD)
   PC1    <- sub_pdata$C1
   PC2    <- sub_pdata$C2
   PC3    <- sub_pdata$C3
-  design = model.matrix(~  age + bmi + gender + batch + cvd + race + site + hardy + PC1 + PC2 + PC3)  
+  design = model.matrix(~  age + bmi + gender + batch + cvd + site + hardy + PC1 + PC2 + PC3)  
   
   # Use voom weighting
   transformedCounts <- sub_exprs
@@ -285,19 +293,7 @@ for(c in clusters){
   limma::plotMA(fit, main = c)
   dev.off()
 }
-# [1] "brain-0"
-# [1] "Running limma pipeline..."
-# NaNs produced
-# [1] "Consensus correlation:"
-# [1] 0.2435535
-# [1] "brain-1"
-# [1] "Running limma pipeline..."
-# [1] "Consensus correlation:"
-# [1] 0.4114889
-# [1] "brain-2"
-# [1] "Running limma pipeline..."
-# [1] "Consensus correlation:"
-# [1] 0.368475
+
 ```
 
 For **other tissues**, gene expression was modelled using the following linear regression formula:
@@ -305,7 +301,7 @@ For **other tissues**, gene expression was modelled using the following linear r
 $$Y \sim \beta_1Sex + \beta_2Age + \beta_3BMI + \beta_4Hardy + \beta_5Batch + \beta_6MHCVD + \beta_7PC1_g + \beta_8PC2_g + \beta_9PC3_g + \epsilon$$
 Only tissues with more than 10 or 15 CeVD samples should be used in DE analyses, but here just using all.
 
-```{R, eval=F}
+```{R, eval=T}
 tissues <- unique(as.character(pdata$our_subtypes))
 tissues <- tissues[!tissues %in% grep("brain", tissues, value = T)]
 for(tissue in tissues){
@@ -321,12 +317,12 @@ for(tissue in tissues){
   gender <- sub_pdata$gender
   batch  <- sub_pdata$SMNABTCHT
   cvd    <- factor(sub_pdata$MHCVD)
-  race   <- factor(as.character(sub_pdata$RACE))
+  #race   <- factor(as.character(sub_pdata$RACE))
   hardy  <- factor(as.character(sub_pdata$DTHHRDY))
   PC1    <- sub_pdata$C1
   PC2    <- sub_pdata$C2
   PC3    <- sub_pdata$C3
-  design = model.matrix(~  age + bmi + gender + batch + cvd + race + hardy + PC1 + PC2 + PC3)  
+  design = model.matrix(~  age + bmi + gender + batch + cvd + hardy + PC1 + PC2 + PC3)  
   
   # Use voom weighting
   transformedCounts <- sub_exprs
@@ -347,29 +343,6 @@ for(tissue in tissues){
 }
 ```
 
-##### DEG amounts in each tissue or cluster
-```{R, fig.height=8}
-all_type <- c(clusters, tissues)
-# A function to plot DEG numbers for all tissues
-count_DEG <- function(table_dir, all_type){
-  sig_count <- c()
-  for(i in all_type){
-    tempt <- read.table(file.path(table_dir, paste0(i, ".tsv")), sep="\t", header=T)
-    sig_count <- c(sig_count, nrow(tempt[tempt$adj.P.Val < 0.1 & abs(tempt$logFC) > log2(1.5), ]))
-  }
-  
-  sc_df <- data.frame(type = all_type, count = sig_count)
-  
-  ggplot(data=sc_df, aes(x=type, y=count)) +
-    geom_bar(stat="identity", fill="skyblue", color="black") +
-    scale_x_discrete(limits=rev(sc_df$type), labels=rev(gsub("_", " ", sc_df$type))) +
-    scale_y_continuous(limits=c(0,1200), expand = c(0.02,0)) +
-    geom_text(aes(label=count), vjust=0.25, hjust=-0.3, size=2.7) +
-    labs(title="DEGs amounts", x="", y="") +
-    coord_flip() + theme_bw()
-}
-count_DEG(table_dir, all_type)
-```
 
 #### Rank the genes in three brain clusters
 
@@ -384,13 +357,19 @@ btt1$esID <- rownames(btt1)
 btt2$esID <- rownames(btt2)
 
 # Merge three adjusted p-vals
-cb_df <- list(btt0[, c("esID", "ID", "adj.P.Val")], btt1[, c("esID",  "adj.P.Val")], btt2[, c("esID",  "adj.P.Val")]) %>% reduce(left_join, by="esID")
+cb_df <- list(btt0[, c("esID", "ID", "t", "adj.P.Val")], btt1[, c("esID", "t", "adj.P.Val")], btt2[, c("esID", "t", "adj.P.Val")]) %>% reduce(left_join, by="esID")
 
 # Compute combined q-val and sort
 cb_df$fisherQ <- sapply(seq_along(cb_df$esID), function(x) sumlog(c(cb_df$adj.P.Val.x[x], cb_df$adj.P.Val.y[x], cb_df$adj.P.Val[x]))$p)
 cb_df <- cb_df[order(cb_df$fisherQ), ]
-head(cb_df, 20)
+head(cb_df, 10)
 
 # Save 
-write.table(cb_df, file.path(main_dir, "results/combined.brains.txt"), sep="\t", col.names = F, row.names = T, quote = F)
+write.table(cb_df, file.path(main_dir, "results/combined.brains.txt"), sep="\t", col.names = T, row.names = T, quote = F)
+```
+
+### Session Information
+
+```{R}
+sessionInfo()
 ```
