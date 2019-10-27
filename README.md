@@ -1,26 +1,37 @@
-# GTEx_CeVD
+# GTEx-CVD
 
+## Introduction
+Cerebrovascular disease (CVD) remains one of the global leading causes of disability and mortality. The previous studies had identified various genetic loci associated with stroke. However, genetic variability that contributes to susceptibility to these diseases and the mechanism underlying CVD largely remain to be explored. Here, we aimed to investigate the effects of having CVD medical history on the molecular signature of human tissues using GTEx RNA-seq data.
 
-| Scripts         |Step |
-|-----------------|-----|
-|filter.Rmd       |1    |
-|limma.Rmd        |2    |
+## Pipeline
 
-### Main steps
+### 1. Preprocessing
+- GTEx v6 data are normalized and clustered using [YARN](https://github.com/QuackenbushLab/yarn)
+- Filter out sex-specific tissues, suboptimal samples, and unannotated subjects
 
-#### 1. Filt subjects and samples
-- Keep subjects with `MHCVD = 0 or 1`
-- Filter out subjects without genotype data from GTEx
-- Remove samples without hardy scale
-- Remove suboptimal samples
-- Exclude samples from sex-specific tissues
- 
-#### 2. Conduct limma-voom on brain transcriptomes and other tissues
-- Exploratary data analysis on MHCVD, gender, age, race and BMI
-- Differential expression analysis on brain clusters and then other tissues
+### 2. Cohort Demography
 
- 
+- Investigate the cohort information for sex, age, tissue, race, etc.
 
+### 3. Differential Expression Analysis
 
+- Conduct linear mixed model:
+  - Brain groups: `Y ~ Sex + Age + BMI + Hardy + Batch + MHCVD + PC1 + PC2 + PC3 + SMTSD + subject`
+  - Others: `Y ~ Sex + Age + BMI + Hardy + Batch + MHCVD + PC1 + PC2 + PC3 `
+- Weights are derived from voom
+- Obtain DEGs with _`t`_, `adj.P.val`, etc.
 
+### 4. Functional Enrichment Analysis
+- Perform pre-ranked gene set enrichment analysis using GSEA v4.0.1
+- `rnk` files are from limma reports
+- `gmt` files are processed from annotation files of various databases
 
+## Preprint
+
+__Analysis of multi-tissue transcriptomes reveals candidate genes and pathways influenced by cerebrovascular diseases__
+
+bioRxiv, 2019, doi: https://doi.org/10.1101/806893
+
+## Updates
+
+I'll update the results using GTEx v8 release.
