@@ -35,3 +35,8 @@ bioRxiv, 2019, doi: https://doi.org/10.1101/806893
 ## Updates
 
 I'll update the results using GTEx v8 release.
+
+## Notes
+
+Warnings in from limma (`lmFit`): if any term in the linear model only has one sample, then there will be a warning: `Warning: Partial NA coefficients for n probe(s)`
+
