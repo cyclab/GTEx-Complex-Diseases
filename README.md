@@ -3,9 +3,18 @@
 ## Introduction
 Cerebrovascular disease (CVD) remains one of the global leading causes of disability and mortality. The previous studies had identified various genetic loci associated with stroke. However, genetic variability that contributes to susceptibility to these diseases and the mechanism underlying CVD largely remain to be explored. Here, we aimed to investigate the effects of having CVD medical history on the molecular signature of human tissues using GTEx RNA-seq data.
 
+## Data exploration
+
+- Comparison of the sample numbers between v6 and v8 releases: `comp.v6.v8.Rmd`
+- Information about subjects and samples: `cohortDemography.Rmd`
+- Principal Coordinates Analysis (PCoA) of tissues: `PCoA.Rmd` 
+- Comparison of tissue-aware normalization methods: `normalization.Rmd`
+	- We decided to use tissue-aware **quantile normalization**
+
 ## RNA-seq analysis
 
 ### 1. Preprocessing
+
 - GTEx v6 data are normalized and clustered using [YARN](https://github.com/QuackenbushLab/yarn)
 - Filter out sex-specific tissues, suboptimal samples, and unannotated subjects
 
@@ -32,9 +41,6 @@ __Analysis of multi-tissue transcriptomes reveals candidate genes and pathways i
 
 bioRxiv, 2019, doi: https://doi.org/10.1101/806893
 
-## Updates
-
-I'll update the results using GTEx v8 release.
 
 ## Notes
 

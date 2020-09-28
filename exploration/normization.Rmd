@@ -1,0 +1,127 @@
+---
+title: "Tissue-aware normalization"
+author: "Chi-Lam Poon"
+date: "12/30/2019"
+output: html_document
+---
+
+
+## Normalization methods
+
+We aimed to compare some commonly seen methods and see their effects on normalization. Their introductions can see this post: [Normalization methods for RNA-seq](https://chilampoon.github.io/2019/12/17/RNA-norm/)
+
+- TMM
+- RLE
+- UQ
+- DESeq
+- QN
+- qsmooth
+- none
+
+```{r setup} 
+suppressPackageStartupMessages({
+  library(yarn)
+  library(stringr)
+  library(Biobase)
+  library(dplyr)
+  library(rafalib)
+  library(readr)
+  library(ggplot2)
+  library(ggpubr)
+  library(edgeR)
+})
+
+source('~/cvd/v8/scripts/tissueAwareNorm.R')
+```
+
+## Load data
+```{r}
+eset <- readRDS('~/cvd/v8/exprs/gtex.filted.rds')
+```
+
+
+## Comparison of normalization methods
+
+```{r comp}
+# select some tissues
+selectt <- c('Brain - Amygdala', 'Artery - Aorta', 'Heart - Atrial Appendage', 'Whole Blood', 'Testis')
+seset <- eset[, which(pData(eset)$SMTSD %in% selectt)]
+dim(seset)
+
+dist.list <- list()
+methods <- c('TMM', 'RLE', 'upperquartile', 'DESeq', 'QN', 'qsmooth', 'none')
+for (method in methods) {
+  dist.list[[method]] <- tissue.aware.norm(seset, "SMTSD", method)
+}
+#saveRDS(dist.list, file='~/cvd/v8/exprs/norm.cpm.rds')
+```
+
+
+Visualization. Note that those densities are log2 (count + 1), not cpm!
+```{r vis, fig.height=13, fig.width=13}
+## auxilary functions
+getColors <- function(vec) {
+  # assgin a color to each group of samples
+  library(RColorBrewer)
+  n <- length(unique(vec))
+  col <- brewer.pal(n, "Paired")
+  #col <- brewer.pal.info[brewer.pal.info$category=='qual', ] # get max. 74 colours
+  #col_all <- unlist(mapply(brewer.pal, col$maxcolors, rownames(col)))
+  ifelse (n > length(col), 
+          cvec <- sample(col, n, replace=T),
+          cvec <- sample(col, n, replace=F)
+  )
+  vec <- as.character(vec)
+  names(vec) <- rep(NA, length(vec))
+  for (g in 1:length(unique(vec))) {
+    names(vec)[which(vec==unique(vec)[g])] <- cvec[g]
+  }
+  vec
+}
+
+
+dens.plot <- function(table, colVec, ...) {
+  cols <- names(colVec)
+  d <- plot(density(table[, 1]), col=cols[1], 
+            lwd=2, las=2, xlab="", ...) +
+    abline(v=0, lty=3) + title(xlab="log2 exprs", ylab=NA) +
+    for (i in 2:ncol(table)) {
+      den <- density(table[, i])
+      lines(den$x, den$y, col=cols[i], lwd=2)
+    } 
+  legend('topright', legend=unique(colVector), lty=1, col=unique(names(colVector)), cex=0.6)
+  d
+}
+
+
+sub.p <- pData(seset)
+sub.p$SMTSD <- factor(sub.p$SMTSD)
+sub.p <- sub.p[order(sub.p$SMTSD),]
+colVector <- getColors(sub.p$SMTSD)
+
+mypar(3, 3)
+for (method in methods) {
+  print(dens.plot(dist.list[[method]][,match(rownames(sub.p), colnames(dist.list[[method]]))], colVector, ylim=c(0, 0.3), main=method))
+}
+```
+
+We chose to use __tissue-aware quantile normalization__.
+
+
+## Data normalization
+Quantile normalize each tissue in a tissue-aware manner.
+```{r norm, eval=T}
+storageMode(eset) <- "environment"
+normalizedMatrix <- tissue.aware.norm(eset, "SMTSD", 'QN')
+all(colnames(normalizedMatrix)==rownames(pData(eset)))
+assayData(eset)[["normalizedMatrix"]] <- normalizedMatrix
+storageMode(eset) <- "lockedEnvironment"
+saveRDS(eset, file='~/cvd/v8/exprs/gtex.filted.norm.rds')
+```
+
+
+### Session info
+```{r session}
+sessionInfo()
+```
+

@@ -1,0 +1,114 @@
+---
+title: "GTEx v8 cohort demography"
+author: "Chi-Lam Poon"
+date: "10/27/2019"
+output: html_document
+---
+
+```{R setup}
+suppressPackageStartupMessages({
+  library(dplyr)
+  library(knitr)
+  library(ggplot2)
+  library(ggpubr)
+  library(stringr)
+  library(reshape2)
+})
+```
+
+
+## Load data
+```{R load}
+v8.dir <- '~/cvd/v8'
+sample <- read.delim(file.path(v8.dir, 'pheno/GTEx_Analysis_v8_Annotations_SampleAttributesDS.txt'))
+subj <- read.delim(file.path(v8.dir, 'pheno/GTEx_Analysis_v8_Annotations_SubjectPhenotypesDS.txt'))
+
+## load v6
+eset <- load(file.path("~/cvd/v6/data/gtex_sub.rdata"))
+```
+
+`SMTSD` is the specific detail of tissue type, and `SMTS` is the parent value to `SMTSD`.
+
+## Sample numbers in each type
+Note that the `Cells - Transformed fibroblasts` from previous releases has been corrected to `Cells - Cultured fibroblasts`.
+
+`SMAFRZE`: Samples included in the GTEx Analysis Freeze
+
+```{R, fig.height=12, fig.width=7}
+# v8 tissues
+sample <- sample[sample$SMAFRZE == "RNASEQ",]
+
+t_count <- sample %>%
+  group_by(SMTSD) %>%
+  summarise(counts=n())
+t_count$SMTSD <- factor(t_count$SMTSD)
+
+## v6 tissues
+t_count2 <- obj3@phenoData@data %>%
+  group_by(SMTSD) %>%
+  summarise(counts=n())
+t_count2$SMTSD <- as.factor(gsub("_", " ", t_count2$SMTSD))
+t_count2$SMTSD <- as.factor(gsub("Cells - Transformed fibroblasts", "Cells - Cultured fibroblasts", t_count2$SMTSD))
+
+
+# merge
+comp <- merge(t_count, t_count2, by='SMTSD', all=T, suffixes = c(".v8",".v6"))
+comp$counts.v6[is.na(comp$counts.v6)] <- 0
+comp <- melt(comp, id.vars = 'SMTSD')
+
+
+ggplot(comp, aes(x=SMTSD, y=value, fill=variable)) +
+  geom_bar(position="dodge", stat = "identity", color="black") + 
+  scale_x_discrete(limits=rev(levels(comp$SMTSD))) +
+  scale_y_continuous(limits=c(0,1000), expand = c(0.02,0)) +
+  coord_flip() +
+  geom_text(aes(SMTSD, value, label = value), size=2.65, vjust=0.4, hjust=-0.25,
+            position = position_dodge(width = 1)) + 
+  guides(fill = guide_legend(reverse = TRUE)) +
+  labs(title="GTEx samples v6 vs v8", x="", y="sample #") +
+  theme_classic()
+
+```
+
+
+## Sex
+1-male, 2-female
+```{R}
+tsubj <- unique(str_extract(sample$SAMPID, "^GTEX-[^-]*"))
+subj <- subj[subj$SUBJID %in% tsubj,]
+table(subj$SEX)
+
+sex_summary <- subj %>% 
+  select(SEX) %>%
+  group_by(SEX) %>%
+  summarise(n = n()) %>%
+  mutate(freq = n / sum(n))
+kable(sex_summary, caption="Sex", format="markdown")
+```
+
+
+## Age
+```{R}
+table(subj$AGE)
+
+age_summary <- subj %>% 
+  select(AGE) %>%
+  group_by(AGE) %>%
+  summarise(n = n()) %>%
+  mutate(freq = n / sum(n))
+kable(age_summary, caption="Age", format="markdown")
+```
+
+
+## Hardy scale
+```{R}
+table(subj$DTHHRDY)
+
+hardy_summary <- subj %>% 
+  select(DTHHRDY) %>%
+  group_by(DTHHRDY) %>%
+  summarise(n = n()) %>%
+  mutate(freq = n / sum(n))
+kable(hardy_summary, caption="Hardy Scale", format="markdown")
+```
+

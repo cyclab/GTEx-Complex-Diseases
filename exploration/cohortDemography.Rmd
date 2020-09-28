@@ -1,0 +1,260 @@
+---
+title: "Cohort demography"
+author: "Chi Lam Poon"
+date: "12/16/2019"
+output: html_document
+---
+
+Genotyping principal components were obtained from GTEx public portal: `GTEx_Analysis_v8_eQTL_covariates.tar.gz`
+
+```{R setup}
+suppressPackageStartupMessages({
+  library(purrr)
+  library(dplyr)
+  library(knitr)
+  library(ggplot2)
+  library(ggpubr)
+  library(Biobase)
+})
+```
+
+## Load data
+```{R load}
+eset <- readRDS("~/cvd/v8/exprs/gtex.filted.rds")
+pdata <- pData(eset)
+```
+
+
+## Exploratory Data Analysis
+### CVD sample number
+
+MHCVD in v8!
+```{R ncvd, fig.width=12, fig.height=12}
+table(pdata$MHCVD)
+pdata$MHCVD <- as.factor(pdata$MHCVD)
+
+m_count1 <- pdata %>% group_by(MHCVD) %>% summarise(counts = n())
+m_count2 <- pdata %>% group_by(SMTSD, MHCVD) %>% summarise(counts = n())
+
+# replace long names
+m_count2$SMTSD <- gsub("\\s*\\([^\\)]+\\)", "", as.character(m_count2$SMTSD))
+
+m1 <- ggplot(m_count1, aes(x=MHCVD, y=counts, fill=MHCVD)) + 
+  geom_bar(stat = "identity", color="black") + 
+  geom_text(aes(label=counts), vjust = -0.15, size = 3) +
+  theme_classic() + theme(axis.title.x=element_blank()) + 
+  scale_fill_manual(values = c("#1aa398", "#ffb353")) +
+  theme(axis.title.x=element_blank(),
+        axis.text.x=element_blank(),
+        axis.line.x=element_blank(),
+        axis.ticks.x=element_blank()) + 
+  scale_y_continuous(limits=c(0,16000), breaks=seq(0,16000,by=2000), expand=c(0,0))
+
+m2 <- ggplot(m_count2, aes(x=MHCVD, y=counts, fill=MHCVD)) +
+  geom_bar(stat="identity", color="black") + 
+  geom_text(aes(label=counts), vjust = -0.1, size = 3) + 
+  theme_classic() +
+  theme(axis.title.x=element_blank(),
+        axis.text.x=element_blank(),
+        axis.title.y=element_blank(),
+        axis.line.x=element_blank(),
+        axis.ticks.x=element_blank()) +
+  scale_fill_manual(values = c("#1aa398", "#ffb353")) + 
+  scale_y_continuous(limits=c(0,800)) +
+  facet_wrap(~SMTSD, ncol=4)
+
+ggarrange(m1, m2, ncol=2, nrow=1, widths=c(1,3), common.legend = T, legend = "right")
+```
+
+
+```{R}
+# Total subject number
+pdata2 <- pdata %>% select(SUBJID, SEX, AGE, RACE, BMI, MHCVD)
+pdata2 <- unique(pdata2)
+rownames(pdata2) <- seq(1, nrow(pdata2))
+nrow(pdata2)
+pdata2$MHCVD <- as.factor(pdata2$MHCVD)
+table(pdata2$MHCVD)
+```
+
+
+### Sex
+```{R sex, fig.width=10}
+pdata2$SEX <- ifelse(pdata2$SEX==1, 'MALE', 'FEMALE')
+table(pdata2[pdata2$MHCVD==1, ]$SEX)
+table(pdata2[pdata2$MHCVD==0, ]$SEX)
+
+# chi-square test
+chi.sex <- chisq.test(rbind(table(pdata2[pdata2$MHCVD==1,]$SEX), table(pdata2[pdata2$MHCVD==0,]$SEX)))
+chi.sex
+
+m_g1 <- ggplot(pdata2, aes(SEX, fill=MHCVD)) +
+  geom_bar(position="stack") +
+  scale_fill_brewer(palette="Set1") + 
+  scale_y_continuous(labels = scales::comma) +
+  ylab("Count") + 
+  ggtitle(paste0("Sex    P-val = ", round(chi.sex$p.value, 2))) +
+  theme_classic()
+
+m_g2 <- ggplot(pdata2, aes(SEX, fill=MHCVD)) +
+  geom_bar(position="fill") +
+  scale_fill_brewer(palette="Set1") + 
+  scale_y_continuous(labels = scales::percent) +
+  ylab("Rate") + 
+  ggtitle("") +
+  theme_classic()
+
+ggarrange(m_g1, m_g2, ncol=2, nrow=1, common.legend = T, legend = "right")
+```
+
+
+### RACE
+
+```{R, fig.width=10}
+pdata2$RACE <- as.factor(pdata2$RACE)
+table(pdata2[pdata2$MHCVD==1, ]$RACE)
+table(pdata2[pdata2$MHCVD==0, ]$RACE)
+chi.race <- chisq.test(rbind(table(pdata2[pdata2$MHCVD==1, ]$RACE), table(pdata2[pdata2$MHCVD==0, ]$RACE)))
+chi.race
+
+m_r1 <- ggplot(pdata2, aes(RACE, fill=MHCVD)) +
+  geom_bar(position="stack") +
+  scale_fill_brewer(palette="Accent") + 
+  scale_x_discrete(labels = c("Asian", "Black or African American", "White", "American Indian or Alaska Native", "Unknown")) +
+  scale_y_continuous(labels = scales::comma) +
+  ylab("Count") + 
+  ggtitle(paste0("Race    P-val = ", round(chi.race$p.value, 2))) +
+  theme_classic() + theme(axis.text.x = element_text(angle = 20, hjust = 1, size = 8.5), 
+                          axis.title.x = element_blank())
+
+m_r2 <- ggplot(pdata2, aes(RACE, fill=MHCVD)) +
+  geom_bar(position="fill") +
+  scale_fill_brewer(palette="Accent") + 
+    scale_x_discrete(labels = c("Asian", "Black or African American", "White", "American Indian or Alaska Native", "Unknown")) +
+  scale_y_continuous(labels = scales::percent) +
+  ylab("Rate") + 
+  ggtitle("") +
+  theme_classic() + theme(axis.text.x = element_text(angle = 20, hjust = 1, size = 8.5), 
+                          axis.title.x = element_blank())
+
+ggarrange(m_r1, m_r2, ncol=2, nrow=1, common.legend = T, legend = "right")
+```
+
+
+### AGE
+```{R age, fig.width=10}
+# Function for T-test
+calculateT <- function(v1, v2){
+  v1 <- as.numeric(v1)
+  v2 <- as.numeric(v2)
+  Ftest <- var.test(v1, v2, alternative = "two.sided")
+  Ttest <- NA
+  ifelse(Ftest$p.value <= 0.05, Ttest <- t.test(v1, v2, paired = F, var.equal = F),
+    Ttest <- t.test(v1, v2, paired = F, var.equal = T))
+  
+  Ttest
+}
+
+# Mean and standard deviation for ages of non-CVD subjects
+mean(pdata2[pdata2$MHCVD==0, ]$AGE)
+sd(pdata2[pdata2$MHCVD==0, ]$AGE)
+
+# Mean and standard deviation for ages of CVD subjects
+mean(pdata2[pdata2$MHCVD==1, ]$AGE)
+sd(pdata2[pdata2$MHCVD==1, ]$AGE)
+
+# T-test for ages in two cohorts
+t.age <- calculateT(pdata2[pdata2$MHCVD==0, ]$AGE, pdata2[pdata2$MHCVD==1, ]$AGE)
+t.age
+
+age_sum <- pdata2 %>%
+  select(AGE, MHCVD) %>%
+  group_by(MHCVD) %>%
+  summarise(mean.age = mean(AGE, na.rm = T))
+
+m_a1 <- ggplot(pdata2, aes(AGE, fill=MHCVD)) +
+  geom_histogram(aes(y=..count..), alpha=0.5) +
+  geom_vline(data=age_sum, aes(xintercept=mean.age, colour=MHCVD), lty=2, size=1) +
+  scale_fill_brewer(palette="Set2") +
+  scale_colour_brewer(palette="Set2") +
+  scale_y_continuous(labels=scales::comma) +
+  ylab("Count") +
+  ggtitle(paste0("Age  P-val = ", formatC(t.age$p.value, format="e", digits = 2))) + 
+  labs(x="ages") +
+  theme_classic()
+
+m_a2 <- ggplot(pdata2, aes(AGE, fill=MHCVD)) +
+  #geom_histogram(aes(y=..density..), alpha=0.5) +
+  geom_density(alpha=.2, aes(colour=MHCVD)) +
+  geom_vline(data=age_sum, aes(xintercept=mean.age, colour=MHCVD), lty=2, size=0.6) +
+  scale_fill_brewer(palette="Set2") +
+  scale_colour_brewer(palette="Set2") +
+  scale_y_continuous(labels=scales::percent) +
+  ylab("Density") +
+  ggtitle("") + 
+  labs(x="ages") +
+  theme_classic() +
+  theme(axis.text.y=element_blank())
+ggarrange(m_a1, m_a2, ncol=2, nrow=1, common.legend = T, legend = "right")
+```
+
+
+### BMI
+```{R bmi, fig.width=10}
+# Mean and standard deviation for BMIs of non-CVD subjects
+mean(pdata2[pdata2$MHCVD==0, ]$BMI)
+sd(pdata2[pdata2$MHCVD==0, ]$BMI)
+
+# Mean and standard deviation for BMIs of CVD subjects
+mean(pdata2[pdata2$MHCVD==1, ]$BMI)
+sd(pdata2[pdata2$MHCVD==1, ]$BMI)
+
+# T-test for BMI in two cohorts
+t.bmi <- calculateT(pdata2[pdata2$MHCVD==0, ]$BMI, pdata2[pdata2$MHCVD==1, ]$BMI)
+t.bmi
+
+bmi_sum <- pdata2 %>%
+  select(BMI, MHCVD) %>%
+  group_by(MHCVD) %>%
+  summarise(mean.bmi = mean(BMI, na.rm = T))
+
+b_a1 <- ggplot(pdata2, aes(BMI, fill=MHCVD)) +
+  geom_histogram(aes(y=..count..), alpha=0.5) +
+  geom_vline(data=bmi_sum, aes(xintercept=mean.bmi, colour=MHCVD), lty=2, size=1) +
+  scale_fill_brewer(palette="Set3") +
+  scale_colour_brewer(palette="Set3") +
+  scale_y_continuous(labels=scales::comma) +
+  ylab("Count") +
+  ggtitle(paste0("BMI  P-val = ", round(t.bmi$p.value, 2))) + 
+  labs(x="BMI") +
+  theme_classic() 
+b_a2 <- ggplot(pdata2, aes(BMI, fill=MHCVD)) +
+  #geom_histogram(aes(y=..density..), alpha=0.5) +
+  geom_density(alpha=.2, aes(colour=MHCVD)) +
+  geom_vline(data=bmi_sum, aes(xintercept=mean.bmi, colour=MHCVD), lty=2, size=1) +
+  scale_fill_brewer(palette="Set3") +
+  scale_colour_brewer(palette="Set3") +
+  scale_y_continuous(labels=scales::percent) +
+  ylab("Density") +
+  ggtitle("") + 
+  labs(x="BMI") +
+  theme_classic() +
+  theme(axis.text.y=element_blank())
+ggarrange(b_a1, b_a2, ncol=2, nrow=1, common.legend = T, legend = "right")
+```
+
+
+
+### Combine those plots
+
+```{r, fig.width=10, fig.height=14}
+ggarrange(m_a1, m_a2, b_a1, b_a2,  m_g1, m_g2, m_r1, m_r2, 
+          ncol=2, nrow=4, common.legend = F, legend = "right",
+          labels = c('A', ' ', 'B', ' ', 'C', ' ', 'D', ' '))
+```
+
+
+
+
+
+
