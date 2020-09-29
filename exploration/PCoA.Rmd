@@ -1,0 +1,173 @@
+---
+title: "PCoA of tissues"
+author: "Chi-Lam Poon"
+date: "12/25/2019"
+output: html_document
+---
+
+YARN: Robust Multi-Tissue RNA-Seq Preprocessing and Normalization
+
+- [Paper](https://bmcbioinformatics.biomedcentral.com/articles/10.1186/s12859-017-1847-x)
+- [Github](https://github.com/QuackenbushLab/yarn)
+
+Here is to do PCoA to check which tissues could be merged.
+
+
+```{r setup} 
+suppressPackageStartupMessages({
+  library(yarn)
+  library(stringr)
+  library(Biobase)
+  library(dplyr)
+  library(plotly)
+  library(doParallel)
+  library(edgeR)
+})
+```
+
+## Load
+```{r}
+eset <- readRDS('~/cvd/v8/exprs/gtex.v8.rds')
+```
+
+
+## YARN
+```{r}
+# sex misannotation
+checkMisAnnotation(eset, "SEX", columnID = "chr", controlGenes="Y", legendPosition="topleft")
+
+# PCoA for each tissues
+checkTissuesToMerge(eset, "SMTS", "SMTSD")
+```
+
+
+
+## Implementation of PCoA (classical MDS)
+
+Extract top 1000 features with high variances to calculate the distances.
+```{R}
+# using euclidean is just PCA right...?
+
+calcDistance <- function(mat, log=F, comp=1:2, nFeature=1000, distMethod='euclidean', sample=TRUE, ...) {
+  # modified from `plotCMDS()` in yarn R package
+  # identify top 1000 high variance genes
+  library(matrixStats)
+  if (!log) {
+    mat <- log2(mat + 1)
+    #mat <- cpm(mat, log = T, prior.count = 1)
+    # mat <- log2(mat)
+    # mat[which(!is.finite(mat))] <- 0 -> mat[which(is.na(mat))]
+  }
+  keep <- which(rowSums(mat) > 0)
+  vars <- rowSds(mat[keep,])
+  idx <- keep[order(vars, decreasing = TRUE)[seq_len(nFeature)]]
+  mat <- mat[idx,]
+  
+  if (sample) mat <- t(mat)
+  
+  # calculate distances
+  d <- dist(mat, method=distMethod)
+  ord <- as.data.frame(cmdscale(d, k=max(comp)))
+  ord
+}
+
+getColors <- function(n) {
+  # assgin a color to each group of samples
+  library(RColorBrewer)
+  #col_all <- brewer.pal(n, "Paired")
+  col <- brewer.pal.info[brewer.pal.info$category=='qual', ] # get max. 74 colours
+  col_all <- unlist(mapply(brewer.pal, col$maxcolors, rownames(col)))
+  ifelse (n > length(col_all), 
+          cvec <- sample(col_all, n, replace=T),
+          cvec <- sample(col_all, n, replace=F)
+  )
+  cvec
+}
+```
+
+
+### try sex again
+```{r sex}
+sex.eset <- eset[which(fData(eset)$chr=='Y'),]
+sex.dist <- calcDistance(exprs(sex.eset), comp = 1:3)
+sex.dist$SEX <- factor(pData(sex.eset)$SEX)
+sex.dist$SEX <- ifelse(sex.dist$SEX==1, 'Male', 'Female')
+
+cols <- c('#965F8A', '#4AC6B7')
+plot_ly(sex.dist, x = ~V1, y = ~V2, z=~V3, color = ~SEX, colors = cols, size = 3) %>%
+  add_markers() %>%
+  layout(scene = list(xaxis = list(title = 'MDS1'),
+                     yaxis = list(title = 'MDS2'),
+                     zaxis = list(title = 'MDS3')))
+
+# what is the third cluster???
+trd <- sex.dist[sex.dist$V2 > 20,]
+trdID <- rownames(trd)
+trdPdata <- pData(eset)[trdID,]
+unique(factor(trdPdata$SMTSD))
+
+# try without testis
+sex.eset <- sex.eset[,which(!pData(sex.eset)$SMTSD %in% "Testis")]
+sex.dist <- calcDistance(exprs(sex.eset), comp = 1:3)
+sex.dist$SEX <- factor(pData(sex.eset)$SEX)
+sex.dist$SEX <- ifelse(sex.dist$SEX==1, 'Male', 'Female')
+
+cols <- c('#965F8A', '#4AC6B7')
+plot_ly(sex.dist, x = ~V1, y = ~V2, z=~V3, color = ~SEX, colors = cols, size = 3) %>%
+  add_markers() %>%
+  layout(scene = list(xaxis = list(title = 'MDS1'),
+                     yaxis = list(title = 'MDS2'),
+                     zaxis = list(title = 'MDS3')))
+```
+
+
+
+#### Brain data
+```{R}
+brain.eset <- eset[,which(pData(eset)$SMTS=='Brain')]
+brain.eset <- brain.eset[which(fData(brain.eset)$chr!='Y'),]
+brain.dist <- calcDistance(exprs(brain.eset), comp = 1:3)
+brain.dist$SMTSD <- factor(gsub('^Brain - ', '', pData(brain.eset)$SMTSD))
+
+#cols <- getColors(length(unique(pData(brain.eset)$SMTSD)))
+cols <- c("#386CB0", "#9f4c13", "#7de675", "#9894cc", "#deb791", "#2d9914", "#bfbfbf", "#fcceca", "#FB8072", "#666666", "#FFD92F", "#afeeee", "#FFFF6B")
+plot_ly(brain.dist, x = ~V1, y = ~V2, z = ~V3, color = ~SMTSD, colors = cols, size = 2.5) %>%
+  add_markers() %>%
+  layout(scene = list(xaxis = list(title = 'MDS1'),
+                     yaxis = list(title = 'MDS2'),
+                     zaxis = list(title = 'MDS3')))
+```
+
+
+### Skin data
+```{R}
+skin.eset <- eset[,which(pData(eset)$SMTS=='Skin')]
+skin.eset <- skin.eset[which(fData(skin.eset)$chr!='Y'),]
+skin.dist <- calcDistance(exprs(skin.eset), comp = 1:3)
+skin.dist$SMTSD <- factor(pData(skin.eset)$SMTSD)
+
+cols <- c('#00c1a3', '#1972A4', '#FF7070')
+plot_ly(skin.dist, x = ~V1, y = ~V2, z = ~V3, color = ~SMTSD, colors = cols, size = 2.5) %>%
+  add_markers() %>%
+  layout(scene = list(xaxis = list(title = 'MDS1'),
+                     yaxis = list(title = 'MDS2'),
+                     zaxis = list(title = 'MDS3')))
+```
+
+
+### Breast data
+The clusters of breast tissues are not due to Y genes, mostly from autosomal genes.
+```{R}
+breast.eset <- eset[,which(pData(eset)$SMTS=='Breast')]
+breast.eset <- breast.eset[which(fData(breast.eset)$chr!='Y'),]
+breast.dist <- calcDistance(exprs(breast.eset), comp = 1:3)
+breast.dist$SEX <- pData(breast.eset)$SEX
+breast.dist$SEX <- ifelse(breast.dist$SEX==1, 'Male', 'Female')
+
+cols <- cols <- c('#965F8A', '#4AC6B7')
+plot_ly(breast.dist, x = ~V1, y = ~V2, z = ~V3, color = ~SEX, colors = cols, size = 3) %>%
+  add_markers() %>%
+  layout(scene = list(xaxis = list(title = 'MDS1'),
+                     yaxis = list(title = 'MDS2'),
+                     zaxis = list(title = 'MDS3')))
+```

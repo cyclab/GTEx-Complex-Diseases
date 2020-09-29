@@ -1,0 +1,169 @@
+---
+title: "GSEA-v8"
+author: "Chi Lam Poon"
+date: "4/6/2020"
+output: html_document
+---
+
+### Prepare files for running GSEA
+
+1. `rnk` files for each tissue
+2. `gmt` files
+3. `gmt.list`
+4. `tissue.names.txt`
+
+See `rnk` format [documentation](http://software.broadinstitute.org/cancer/software/gsea/wiki/index.php/Data_formats#RNK:_Ranked_list_file_format_.28.2A.rnk.29)
+
+Select the gene symbol and t-statistics columns in the limma reports to generate rnk files.
+```{bash prepare, eval=F}
+cd ~/cvd/v8/results/new/noRACE/tables
+ls | sed 's/.txt//g' > ../tissue.list
+while read t; do cat $t.txt | cut -f 2,5 | sed '1d' > ../../../gsea/rnk/$t.rnk; done < tissue.list
+
+cd ~/cvd/v8/gsea/gmt
+mkdir names
+for i in *.gmt; ls -1 -d "$PWD/"$i > names/$i;done
+
+ls | sed 's/.rnk//g' > ../tissue.list
+```
+
+
+Only following tissues were chosen:
+
+- Adipose_Visceral
+- Artery_Tibial
+- Brain_Caudate
+- Brain_Spinal_cord
+
+
+### Functional enrichment analysis: perform pre-ranked GSEA 
+Pre-ranked GSEA was conducted on gene lists ranked by the t-statistics from the results of DE analysis.
+
+#### Install java 11 without root
+```{bash install, eval=F}
+wget https://download.java.net/openjdk/jdk11/ri/openjdk-11+28_linux-x64_bin.tar.gz
+tar xvf openjdk-11+28_linux-x64_bin.tar.gz 
+rm openjdk-11+28_linux-x64_bin.tar.gz
+
+# set up enviornment variables:
+vi ~/.bashrc
+export PATH=/home/pclam/java/jdk-11/bin:$PATH
+source ~/.bashrc
+```
+
+Download gsea-4.0.1 program from [GSEA download site](http://software.broadinstitute.org/gsea/downloads.jsp) to the desktop, then send to ubuntu. [14 Sep 2019]
+
+
+GMT:
+
+- hallmark gene sets: `h.all.v7.1.symbols.gmt`
+- positional gene sets: `c1.all.v7.1.symbols.gmt`
+- curated gene sets: `c2.all.v7.1.symbols.gmt`
+- regulatory target gene sets: `c3.all.v7.1.symbols.gmt`
+- computational gene sets: `c4.all.v7.1.symbols.gmt`
+- gene ontology (GO) gene sets: `c5.all.v7.1.symbols.gmt`
+- oncogenic signatures gene sets: `c6.all.v7.1.symbols.gmt`
+- immunologic signatures gene sets: `c7.all.v7.1.symbols.gmt`
+- [Human Phenotype Ontology (HPO)](https://hpo.jax.org/app/download/annotation): `ALL_SOURCES_ALL_FREQUENCIES_phenotype_to_genes.txt` -> `hpo.symbols.gmt`
+- Disease Ontology from [alliance of genome resource](https://build.alliancegenome.org/downloads): `disease-annotations-DOID-4.tsv` -> `do.symbols.gmt`
+
+#### HPO process
+```{R, eval=F}
+hpo <- read.delim('~/cvd/v8/gsea/gmt/ALL_SOURCES_ALL_FREQUENCIES_phenotype_to_genes.txt', comment.char = "#", col.names = c('HPOID', 'HPOName', 'GeneID', 'GeneName'), check.names = F)
+#hpo$HPOID <- gsub(':', '_', hpo$HPOID)
+
+# convert long dataframe to wide
+hpo.split <- split(hpo$GeneName, hpo$HPOName)
+hpo.split <- lapply(hpo.split, as.character)
+# save first row
+write.table(data.frame(names(hpo.split)[1], rbind(hpo.split[[names(hpo.split)[1]]])), file='~/cvd/v8/gsea/gmt/hpo.symbols.gmt', sep = '\t',
+            row.names = F, col.names = F, quote = F)
+
+crow <- function(no) {
+  cat(c(names(hpo.split)[no], hpo.split[[names(hpo.split)[no]]], '\n'), sep = '\t', file='~/cvd/v8/gsea/gmt/hpo.symbols.gmt', append=T)
+}
+
+lapply(2:length(hpo.split), crow)
+```
+
+
+#### DO process
+```{R do, eval=F}
+do <- read.delim(file='~/cvd/v8/gsea/gmt/disease-annotations-DOID-4.tsv')
+do <- do[do$Species=='Homo sapiens', ] # human only
+do <- do[,c('Gene.Symbol', 'Disease.Name')]
+do$Disease.Name <- factor(do$Disease.Name) # eliminate empty terms
+do.split <- split(do$Gene.Symbol, do$Disease.Name)
+do.split <- lapply(do.split, as.character)
+
+# save first row
+write.table(data.frame(names(do.split)[1], rbind(do.split[[names(do.split)[1]]])), file='~/cvd/v8/gsea/gmt/do.symbols.gmt', sep = '\t',
+            row.names = F, col.names = F, quote = F)
+crow <- function(no) {
+  cat(c(names(do.split)[no], do.split[[names(do.split)[no]]], '\n'), sep = '\t', file='~/cvd/v8/gsea/gmt/do.symbols.gmt', append=T)
+}
+
+lapply(2:length(do.split), crow)
+```
+
+
+#### Run Java program
+Note that the `-gmx` argument should be a file listed pointers to gmt files, not the exact paths. And terms should be unique among these gmt files. Thus, I added prefix like `DO_` and `HPO_` to them.
+
+`./run.prerank.sh > gsea.prerank.log`
+
+### Visualization
+
+#### Seperate expression values by tissues for enrichment map
+```{R, eval=F}
+data <- readRDS("~/cvd/v8/exprs/gtex.filted.norm.rds")
+tissues <- c('Adipose - Visceral (Omentum)', 'Artery - Tibial', 'Brain - Caudate (basal ganglia)', 'Brain - Spinal cord (cervical c-1)')
+expr <- exprs(data)
+pdata <- pData(data)
+gl <- as.character(fData(data)$geneNames)
+
+for (t in tissues) {
+  ids <- rownames(pdata[pdata$SMTSD %in% t,])
+  sub.expr <- expr[,which(colnames(expr) %in% ids)]
+  tmp <- cbind(gl, sub.expr)
+  write.table(tmp, file=paste0('~/cvd/v8/gsea/map.res/expr.sub/', t, '.expr.txt'), quote = F, col.names = T, row.names = F, sep = '\t')
+}
+```
+
+
+#### Try word cloud
+```{R, eval=F}
+# try word cloud for GO terms 
+library(wordcloud)
+library(tm)
+library(SnowballC)
+
+word <- go.pos$name
+word <- gsub('^GO_', '', word)
+
+docs <- Corpus(VectorSource(word))
+# Convert the text to lower case
+docs <- tm_map(docs, content_transformer(tolower))
+
+toSpace <- content_transformer(function (x , pattern) gsub(pattern, " ", x))
+docs <- tm_map(docs, toSpace, "_")
+# Remove english common stopwords
+docs <- tm_map(docs, removeWords, stopwords("english"))
+
+# specify your stopwords as a character vector
+#docs <- tm_map(docs, removeWords, c("cell", "involved", "regulation", "positive", 'negative', 'process', 'response', 'production'))
+
+
+dtm <- TermDocumentMatrix(docs)
+m <- as.matrix(dtm)
+v <- sort(rowSums(m), decreasing=TRUE)
+d <- data.frame(word = names(v),freq = v)
+
+set.seed(1234)
+wordcloud(words = d$word, freq = d$freq, min.freq = 2,
+          max.words=40, random.order=FALSE, rot.per=0.1, 
+          colors=brewer.pal(6, "Accent"))
+
+```
+
+

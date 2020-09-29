@@ -1,0 +1,94 @@
+---
+title: "Plots for pathways"
+author: "Chi Lam Poon"
+date: "5/25/2020"
+output: html_document
+---
+
+```{r setup}
+suppressPackageStartupMessages({
+  library(ggplot2)
+  library(venn)
+})
+
+```
+
+
+### DO & HPO
+```{r}
+gsea.dir <- '~/cvd/v8/gsea/map.res'
+tissues <- c('Brain_Spinal_cord', 'Brain_Caudate', 'Artery_Tibial', 'Adipose_Visceral')
+
+do <- list()
+for (t in tissues) {
+  do[[t]] <- list()
+  do[[t]][['pos']] <- read.delim(file.path(gsea.dir, t, 'do.pos.txt'), sep="\t")
+  do[[t]][['pos']] <- do[[t]][['pos']][do[[t]][['pos']]$FDR.q.val<0.1,]
+  do[[t]][['neg']] <- read.delim(file.path(gsea.dir, t, 'do.neg.txt'), sep="\t")
+  do[[t]][['neg']] <- do[[t]][['neg']][do[[t]][['neg']]$FDR.q.val<0.1,]
+}
+
+v.dopos <- venn(list(`Viseral Adipose`=do[['Adipose_Visceral']][['pos']]$NAME,
+                  `Tibial Artery`=do[['Artery_Tibial']][['pos']]$NAME,
+             `Caudate`=do[['Brain_Caudate']][['pos']]$NAME,
+             `Spinal Cord`=do[['Brain_Spinal_cord']][['pos']]$NAME),
+             intersections = T, box = F)
+
+# intersections
+isect <- attr(v.dopos, "intersection")
+isect[["Viseral Adipose:Tibial Artery:Caudate:Spinal Cord"]]
+
+v.doneg <- venn(list(`Viseral Adipose`=do[['Adipose_Visceral']][['neg']]$NAME,
+                  `Tibial Artery`=do[['Artery_Tibial']][['neg']]$NAME,
+             `Caudate`=do[['Brain_Caudate']][['neg']]$NAME,
+             `Spinal Cord`=do[['Brain_Spinal_cord']][['neg']]$NAME),
+             intersections = T, box = F)
+
+# intersections
+attr(v.doneg, "intersection")
+```
+
+
+```{r}
+hpo <- list()
+for (t in tissues) {
+  hpo[[t]] <- list()
+  hpo[[t]][['pos']] <- read.delim(file.path(gsea.dir, t, 'hpo.pos.txt'), sep="\t")
+  hpo[[t]][['pos']] <- hpo[[t]][['pos']][hpo[[t]][['pos']]$FDR.q.val<0.1,]
+  hpo[[t]][['neg']] <- read.delim(file.path(gsea.dir, t, 'hpo.neg.txt'), sep="\t")
+  hpo[[t]][['neg']] <- hpo[[t]][['neg']][hpo[[t]][['neg']]$FDR.q.val<0.1,]
+}
+
+v.hpopos <- venn(list(`Viseral Adipose`=hpo[['Adipose_Visceral']][['pos']]$NAME,
+                  `Tibial Artery`=hpo[['Artery_Tibial']][['pos']]$NAME,
+             `Caudate`=hpo[['Brain_Caudate']][['pos']]$NAME,
+             `Spinal Cord`=hpo[['Brain_Spinal_cord']][['pos']]$NAME),
+             intersections = T, box = F)
+
+# intersections
+hposec <- attr(v.hpopos, "intersection")
+hposec[["Viseral Adipose:Tibial Artery:Caudate:Spinal Cord"]]
+
+
+v.hponeg <- venn(list(`Viseral Adipose`=hpo[['Adipose_Visceral']][['neg']]$NAME,
+                      `Tibial Artery`=hpo[['Artery_Tibial']][['neg']]$NAME,
+                      `Caudate`=hpo[['Brain_Caudate']][['neg']]$NAME,
+                      `Spinal Cord`=hpo[['Brain_Spinal_cord']][['neg']]$NAME),
+                      intersections = T, box = F)
+
+# intersections
+hposec2 <- attr(v.hponeg, "intersection")
+hposec2[["Viseral Adipose:Caudate:Spinal Cord"]]
+```
+
+
+
+
+
+
+
+
+
+
+
+

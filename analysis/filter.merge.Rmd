@@ -1,0 +1,260 @@
+---
+title: "Filtering and merging"
+author: "Chi Lam Poon"
+date: "1/1/2020"
+output: html_document
+---
+
+Filter genes in a _tissue-aware_ manner. Details see the YARN paper.
+
+
+```{r setup} 
+suppressPackageStartupMessages({
+  library(yarn)
+  library(stringr)
+  library(Biobase)
+  library(dplyr)
+  library(rafalib)
+  library(readr)
+  library(ggplot2)
+  library(ggpubr)
+  library(edgeR)
+})
+```
+
+## Load data
+```{r}
+eset <- readRDS("~/cvd/v8/exprs/gtex.v8.rds")
+dim(eset)
+```
+
+## Remove suboptimal samples
+
+Those with `FLAGGED` in the `SMTORMVE` field were removed.
+
+```{r}
+table(pData(eset)$SMTORMVE)
+```
+Seems no `FLAGGED` sample in RNA-seq.
+
+
+## Modify and filter subjects
+
+Criteria:
+
+1. MHCVD was recorded as value `0 (No)`, `1 (Yes)` and `99 (Unknown)`, therefore subjects with `0` or `1` were kept
+2. Remove samples with `NA` Hardy scale values
+3. Remove samples with `NA` ischemic time
+4. Remove samples without batch info.
+
+```{r}
+# filter according to the criteria
+sub.eset <- eset[, which((pData(eset)$MHCVD %in% c(0, 1)) & 
+                           (!is.na(pData(eset)$DTHHRDY)) & 
+                           (!is.na(pData(eset)$SMTSISCH)) &
+                           (pData(eset)$SMNABTCHT != ""))]
+
+dim(sub.eset); length(unique(pData(sub.eset)$SUBJID)); all(rownames(pData(sub.eset)) == colnames(exprs(sub.eset)))
+
+# # convert NA Hardy scale to 5
+# pData(sub.eset)[is.na(pData(sub.eset)$DTHHRDY),]$DTHHRDY <- 5
+```
+
+
+## Remove unwanted tissues
+
+Let's see how many samples first.
+```{r, fig.width=14, fig.height=14}
+pdata <- pData(sub.eset)
+pdata$MHCVD <- factor(pdata$MHCVD)
+
+m_count1 <- pdata %>% group_by(MHCVD) %>% summarise(counts = n())
+m_count2 <- pdata %>% group_by(SMTSD, MHCVD) %>% summarise(counts = n())
+
+# replace long names
+# m_count2$our_subtypes <- gsub('adipose visceral \\(omentum\\)', 'adipose visceral', m_count2$our_subtypes)
+# m_count2$our_subtypes <- gsub('esophagus gastroesophageal junction', 'gastroesophageal junction', m_count2$our_subtypes)
+# m_count2$our_subtypes <- gsub('small intestine terminal ileum', 'intestine terminal ileum', m_count2$our_subtypes)
+
+m1 <- ggplot(m_count1, aes(x=MHCVD, y=counts, fill=MHCVD)) + 
+  geom_bar(stat = "identity", color="black") + 
+  geom_text(aes(label=counts), vjust = -0.15, size = 3) +
+  theme_classic() + theme(axis.title.x=element_blank()) + 
+  scale_fill_manual(values = c("#1aa398", "#ffb353")) +
+  theme(axis.title.x=element_blank(),
+        axis.text.x=element_blank(),
+        axis.line.x=element_blank(),
+        axis.ticks.x=element_blank()) + 
+  scale_y_continuous(limits=c(0,16000), breaks=seq(0,16000,by=2000), expand=c(0,0))
+
+m2 <- ggplot(m_count2, aes(x=MHCVD, y=counts, fill=MHCVD)) +
+  geom_bar(stat="identity", color="black") + 
+  geom_text(aes(label=counts), vjust = -0.1, size = 3) + 
+  theme_classic() +
+  theme(axis.title.x=element_blank(),
+        axis.text.x=element_blank(),
+        axis.title.y=element_blank(),
+        axis.line.x=element_blank(),
+        axis.ticks.x=element_blank()) +
+  scale_fill_manual(values = c("#1aa398", "#ffb353")) + 
+  scale_y_continuous(limits=c(0,850)) +
+  facet_wrap(~SMTSD,ncol=4) 
+
+ggarrange(m1, m2, ncol=2, nrow=1, widths=c(1,3), common.legend = T, legend = "right")
+```
+
+
+Exclude following tissues based on sample number (`MHCVD=1` >= 12). Check GTEx [tissue sampling sites](https://gtexportal.org/home/samplingSitePage)
+
+- Cells - Cultured fibroblasts
+- Cells - EBV-transformed lymphocytes
+- Cells - Leukemia cell line (CML)
+- Cervix - Ectocervix
+- Cervix - Endocervix
+- Bladder
+- Fallopian Tube
+- Kidney - Cortex
+- Kidney - Medulla
+
+```{r}
+dim(sub.eset)
+throwTissues <- c('Cells - Cultured fibroblasts', 'Cells - EBV-transformed lymphocytes', 'Cells - Leukemia cell line (CML)', 'Cervix - Ectocervix', 'Cervix - Endocervix', 'Bladder', 'Fallopian Tube', 'Kidney - Cortex', 'Kidney - Medulla')
+
+sub.eset2 <- sub.eset[, which(!pData(sub.eset)$SMTSD %in% throwTissues)]
+dim(sub.eset2); all(rownames(pData(sub.eset2))==colnames(exprs(sub.eset2)))
+```
+
+
+## Merge tissues
+
+> We decided NOT to merge tissues in the new linear model.
+
+The following tissues can be merge:
+
+1. Skin 
+  1. Skin - Not Sun Exposed (Suprapubic)
+  2. Skin - Sun Exposed (Lower leg)
+  
+2. Brain cerebellum
+  1. Brain - Cerebellum
+  2. Brain - Cerebellar Hemisphere
+  
+3. Brain basal ganglia
+  1. Brain - Caudate (basal ganglia)
+  2. Brain - Nucleus accumbens (basal ganglia)
+  3. Brain - Putamen (basal ganglia)
+
+4. Brain cortex
+  1. Brain - Cortex
+  2. Brain - Frontal Cortex (BA9)
+  3. Brain - Anterior cingulate cortex (BA24)
+
+
+```{r merge, eval=F}
+pData(sub.eset)$our_subtypes <- pData(sub.eset)$SMTSD
+## skin
+pData(sub.eset)$our_subtypes <- gsub('Skin - Not Sun Exposed \\(Suprapubic\\)', 'Skin', pData(sub.eset)$our_subtypes)
+pData(sub.eset)$our_subtypes <- gsub('Skin - Sun Exposed \\(Lower leg\\)', 'Skin', pData(sub.eset)$our_subtypes)
+## brain cerebellum
+pData(sub.eset)$our_subtypes <- gsub('Brain - Cerebellar Hemisphere', 'Brain - Cerebellum', pData(sub.eset)$our_subtypes)
+## brain basal ganglia
+pData(sub.eset)$our_subtypes <- gsub('Brain - Caudate \\(basal ganglia\\)', 'Brain - Basal Ganglia', pData(sub.eset)$our_subtypes)
+pData(sub.eset)$our_subtypes <- gsub('Brain - Nucleus accumbens \\(basal ganglia\\)', 'Brain - Basal Ganglia', pData(sub.eset)$our_subtypes)
+pData(sub.eset)$our_subtypes <- gsub('Brain - Putamen \\(basal ganglia\\)', 'Brain - Basal Ganglia', pData(sub.eset)$our_subtypes)
+## brain cortex
+pData(sub.eset)$our_subtypes <- gsub('Brain - Frontal Cortex \\(BA9\\)', 'Brain - Cortex', pData(sub.eset)$our_subtypes)
+pData(sub.eset)$our_subtypes <- gsub('Brain - Anterior cingulate cortex \\(BA24\\)', 'Brain - Cortex', pData(sub.eset)$our_subtypes)
+
+pData(sub.eset)$our_subtypes <- gsub(' - ', ' ', pData(sub.eset)$our_subtypes)
+pData(sub.eset)$our_subtypes <- gsub('\\s*\\([^\\)]+\\)', '', pData(sub.eset)$our_subtypes)
+
+pData(sub.eset)$our_subtypes <- factor(pData(sub.eset)$our_subtypes)
+
+# replace " - " & " "; turn into lower cases
+pData(sub.eset)$our_subtypes <- tolower(pData(sub.eset)$our_subtypes)
+pData(sub.eset)$our_subtypes <- gsub(" - ", "_", pData(sub.eset)$our_subtypes)
+pData(sub.eset)$our_subtypes <- gsub(" ", "_", pData(sub.eset)$our_subtypes)
+unique(pData(sub.eset)$our_subtypes)
+```
+
+
+### View the samples again
+MHCVD in v8!
+```{R ncvd, fig.width=12, fig.height=12}
+table(pData(sub.eset2)$MHCVD)
+pData(sub.eset2)$MHCVD <- factor(pData(sub.eset2)$MHCVD)
+
+m_count1 <- pData(sub.eset2) %>% group_by(MHCVD) %>% summarise(counts = n())
+m_count2 <- pData(sub.eset2) %>% group_by(SMTSD, MHCVD) %>% summarise(counts = n())
+
+# remove parentheses and contents within
+m_count2$SMTSD <- gsub("\\s*\\([^\\)]+\\)", "", as.character(m_count2$SMTSD))
+
+m1 <- ggplot(m_count1, aes(x=MHCVD, y=counts, fill=MHCVD)) + 
+  geom_bar(stat = "identity", color="black") + 
+  geom_text(aes(label=counts), vjust = -0.15, size = 3) +
+  theme_classic() + theme(axis.title.x=element_blank()) + 
+  scale_fill_manual(values = c("#1aa398", "#ffb353")) +
+  theme(axis.title.x=element_blank(),
+        axis.text.x=element_blank(),
+        axis.line.x=element_blank(),
+        axis.ticks.x=element_blank()) + 
+  scale_y_continuous(limits=c(0,16000), breaks=seq(0,16000,by=2000), expand=c(0,0))
+
+m2 <- ggplot(m_count2, aes(x=MHCVD, y=counts, fill=MHCVD)) +
+  geom_bar(stat="identity", color="black") + 
+  geom_text(aes(label=counts), vjust = -0.1, size = 3) + 
+  theme_classic() +
+  theme(axis.title.x=element_blank(),
+        axis.text.x=element_blank(),
+        axis.title.y=element_blank(),
+        axis.line.x=element_blank(),
+        axis.ticks.x=element_blank()) +
+  scale_fill_manual(values = c("#1aa398", "#ffb353")) + 
+  scale_y_continuous(limits=c(0,830)) +
+  facet_wrap(~SMTSD, ncol=4)
+
+ggarrange(m1, m2, ncol=2, nrow=1, widths=c(1,3), common.legend = T, legend = "right")
+```
+
+
+## Filter genes
+Need to filter out some lowly-expressed genes.
+
+### Remove those were 0 across all samples
+```{r}
+for (i in 1:nrow(problems(exprs(sub.eset2)))) {
+  exprs(sub.eset2)[problems(exprs(sub.eset2))$row[i], problems(exprs(sub.eset2))$col[i]] <- 1e+05
+}
+throwAway <- which(rowSums(exprs(sub.eset2)) == 0) # 326
+sub.eset3 <- sub.eset2[-throwAway, ]
+rm(sub.eset, sub.eset1, sub.eset2)
+```
+
+
+### Detele Y genes
+```{r}
+sub.eset4 <- sub.eset3[which(fData(sub.eset3)$chr != 'Y'),] # 500 genes
+```
+
+
+### Filter genes in a tissue-aware manner
+Genes < 1 CPM in fewer than half of the number of samples of the smallest set of related samples are **out**.
+```{r}
+pData(sub.eset4)$SMTSD <- factor(pData(sub.eset4)$SMTSD)
+minSamples <- min(table(pData(sub.eset4)$SMTSD))
+minSamples <- floor(minSamples / 2) #69
+counts <- cpm(exprs(sub.eset4))
+keep <- rowSums(counts > 1) >= minSamples
+sum(keep)
+sub.eset5 <- sub.eset4[keep,]
+dim(sub.eset5)
+rm(sub.eset3, sub.eset4)
+```
+
+
+## Save data
+```{r, eval=T}
+saveRDS(sub.eset5, file='~/cvd/v8/exprs/gtex.filted.rds')
+```
+
