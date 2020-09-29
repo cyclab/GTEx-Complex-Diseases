@@ -1,0 +1,234 @@
+---
+title: "Plots for DEGs"
+author: "Chi Lam Poon"
+date: "3/23/2020"
+output: html_document
+---
+
+For drawing plots.
+
+```{r setup}
+suppressPackageStartupMessages({
+  library(purrr)
+  library(dplyr)
+  library(knitr)
+  library(ggplot2)
+  library(ggpubr)
+  library(reshape2)
+  library(Biobase)
+})
+```
+
+
+### Load data
+```{r load}
+res.dir <- '~/cvd/v8/results/new'
+eset <- readRDS("~/cvd/v8/exprs/gtex.filted.norm.rds")
+noR.dir <- '~/cvd/v8/results/new/noRACE'
+addR.dir <- '~/cvd/v8/results/new/addRACE'
+```
+
+
+
+### 1. Numbers of DE genes
+#### Without race
+```{r}
+table.dir <- file.path(noR.dir, 'tables')
+tissues <- unique(as.character(pData(eset)$SMTSD))
+FCthres <- 1.5
+Pthres <- 0.05
+
+# Plot DEG numbers for all tissues
+sc_df <- data.frame(tissue = tissues, total = rep(0, length(tissues)), 
+                    up = rep(0, length(tissues)), down = rep(0, length(tissues)))
+
+for (i in tissues) {
+  tmp <- read.table(file.path(table.dir, paste0(i, ".txt")), sep="\t", header=T)
+  tmp <- tmp[!is.na(tmp$logFC),]
+  sc_df[sc_df$tissue==i,]$total <- nrow(tmp[(tmp$adj.P.Val < Pthres) & (abs(tmp$logFC) > log2(FCthres)),])
+  sc_df[sc_df$tissue==i,]$up <- nrow(tmp[(tmp$adj.P.Val < Pthres) & (tmp$logFC > log2(FCthres)),])
+  sc_df[sc_df$tissue==i,]$down <- nrow(tmp[(tmp$adj.P.Val < Pthres) & (tmp$logFC < -log2(FCthres)),])
+}
+
+sc_df <- sc_df[sc_df$total != 0,]
+sc_df <- sc_df[order(sc_df$tissue),]
+long <- melt(sc_df, id.vars = 'tissue')
+long <- long[long$variable!='total',]
+print(sc_df)
+
+ggplot(data=long, aes(x=tissue, y=value, fill=variable)) +
+  geom_bar(stat="identity", color="black") +
+  scale_x_discrete(limits=rev(sc_df$tissue), labels=rev(gsub("_", " ", sc_df$tissue))) +
+  scale_y_continuous(limits=c(0, 800), expand = c(0.02, 0)) +
+  #geom_text(aes(label=count), vjust=0.25, hjust=-0.3, size=2.7) +
+  labs(title="", x="", y="", fill="") +  scale_fill_manual(labels = c("up-regulated", "down-regulated"),values=c('#2d93af','#8fd7e2')) +
+  coord_flip() + theme_classic()
+```
+
+
+#### With race
+```{r, eval=T}
+table.dir <- file.path(addR.dir, 'tables')
+tissues <- unique(as.character(pData(eset)$SMTSD))
+FCthres <- 1.5
+Pthres <- 0.05
+
+# Plot DEG numbers for all tissues
+sc_df <- data.frame(tissue = tissues, total = rep(0, length(tissues)), 
+                    up = rep(0, length(tissues)), down = rep(0, length(tissues)))
+sc_df <- sc_df[order(sc_df$tissue),]
+
+for (i in tissues) {
+  tmp <- read.table(file.path(table.dir, paste0(i, ".txt")), sep="\t", header=T)
+  tmp <- tmp[!is.na(tmp$logFC),]
+  sc_df[sc_df$tissue==i,]$total <- nrow(tmp[(tmp$adj.P.Val < Pthres) & (abs(tmp$logFC) > log2(FCthres)),])
+  sc_df[sc_df$tissue==i,]$up <- nrow(tmp[(tmp$adj.P.Val < Pthres) & (tmp$logFC > log2(FCthres)),])
+  sc_df[sc_df$tissue==i,]$down <- nrow(tmp[(tmp$adj.P.Val < Pthres) & (tmp$logFC < -log2(FCthres)),])
+}
+
+sc_df <- sc_df[sc_df$total != 0,]
+long <- melt(sc_df, id.vars = 'tissue')
+long <- long[long$variable!='total',]
+
+
+ggplot(data=long, aes(x=tissue, y=value, fill=variable)) +
+  geom_bar(stat="identity", color="black") +
+  scale_x_discrete(limits=rev(sc_df$tissue), labels=rev(gsub("_", " ", sc_df$tissue))) +
+  scale_y_continuous(limits=c(0, 800), expand = c(0.02, 0)) +
+  #geom_text(aes(label=count), vjust=0.25, hjust=-0.3, size=2.7) +
+  labs(title="", x="", y="", fill="") +  scale_fill_manual(labels = c("up-regulated", "down-regulated"),values=c('#2d93af','#8fd7e2')) +
+  coord_flip() + theme_classic()
+```
+
+
+### Density plot
+
+```{r}
+## auxilary functions
+getColors <- function(vec) {
+  # assgin a color to each group of samples
+  library(RColorBrewer)
+  n <- length(unique(vec))
+  #col <- brewer.pal(n, "Paired")
+  col <- brewer.pal.info[brewer.pal.info$category=='qual', ] # get max. 74 colours
+  col_all <- unlist(mapply(brewer.pal, col$maxcolors, rownames(col)))
+  if (n > length(col_all)) {
+    cvec <- sample(col_all, n, replace=T)
+  } else {
+    cvec <- sample(col_all, n, replace=F)
+  }
+  vec <- as.character(vec)
+  names(vec) <- rep(NA, length(vec))
+  for (g in 1:length(unique(vec))) {
+    names(vec)[which(vec==unique(vec)[g])] <- cvec[g]
+  }
+  vec
+}
+
+
+dens.plot <- function(table, colVec, legendFlag=FALSE, ...) {
+  cols <- names(colVec)
+  d <- plot(density(table[, 1]), col=cols[1], 
+            lwd=2, las=2, xlab="", ...) +
+    abline(v=0, lty=3) + title(xlab="log2 exprs", ylab=NA) +
+    for (i in 2:ncol(table)) {
+      den <- density(table[, i])
+      lines(den$x, den$y, col=cols[i], lwd=2)
+    }
+  if (legendFlag) {
+   legend('topright', legend=unique(colVector), lty=1, col=unique(names(colVector)), cex=0.6) 
+  }
+  d
+}
+```
+
+
+```{r}
+sort.eset <- eset[, order(pData(eset)$SMTSD)]
+colVector <- getColors(pData(sort.eset)$SMTSD)
+dens.plot(assayData(sort.eset)[['normalizedMatrix']], colVector, ylim=c(0,0.3), main='v8 data')
+```
+
+
+### DEG overlap
+
+```{r}
+sel.tissues <- c('Adipose - Visceral (Omentum)',
+                 'Artery - Tibial',
+                 'Brain - Caudate (basal ganglia)',
+                 'Brain - Spinal cord (cervical c-1)')
+table.dir <- file.path(noR.dir, 'tables')
+
+deg.list <- list()
+for (t in sel.tissues) {
+  tmp <- read.table(file.path(table.dir, paste0(t, ".txt")), sep="\t", header=T)
+  tmp <- tmp[!is.na(tmp$logFC),]
+  
+  deg.list[[t]] <- list()
+  deg.list[[t]][['up']] <- as.character(tmp[(tmp$adj.P.Val < Pthres) & (tmp$logFC > log2(FCthres)),]$ID)
+  deg.list[[t]][['down']] <- as.character(tmp[(tmp$adj.P.Val < Pthres) & (tmp$logFC < -log2(FCthres)),]$ID)
+}
+
+
+## Venn diagrams
+library(venn)
+v.up <- venn(list(`Viseral Adipose`=deg.list[['Adipose - Visceral (Omentum)']]$up,
+                  `Tibial Artery`=deg.list[['Artery - Tibial']]$up,
+             `Caudate`=deg.list[['Brain - Caudate (basal ganglia)']]$up,
+             `Spinal Cord`=deg.list[['Brain - Spinal cord (cervical c-1)']]$up),
+             intersections = T, box = F)
+
+v.down <- venn(list(`Viseral Adipose`=deg.list[['Adipose - Visceral (Omentum)']]$down,
+                  `Tibial Artery`=deg.list[['Artery - Tibial']]$down,
+             `Caudate`=deg.list[['Brain - Caudate (basal ganglia)']]$down,
+             `Spinal Cord`=deg.list[['Brain - Spinal cord (cervical c-1)']]$down),
+             intersections = T, box = F)
+
+v.all <- venn(list(`Viseral Adipose`=unlist(deg.list[['Adipose - Visceral (Omentum)']]),
+                `Tibial Artery`=unlist(deg.list[['Artery - Tibial']]),
+             `Caudate`=unlist(deg.list[['Brain - Caudate (basal ganglia)']]),
+             `Spinal Cord`=unlist(deg.list[['Brain - Spinal cord (cervical c-1)']])),
+             intersections = T, box = F)
+
+```
+
+### Colorful venn
+```{r colorVenn}
+library(VennDiagram)
+
+library(RColorBrewer)
+myCol <- brewer.pal(4, "Pastel2")
+darken <- function(color, factor=1.4){
+    col <- col2rgb(color)
+    col <- col/factor
+    col <- rgb(t(col), maxColorValue=255)
+    col
+}
+
+venn.diagram(x=list(unlist(deg.list[['Brain - Caudate (basal ganglia)']]), 
+                    unlist(deg.list[['Brain - Spinal cord (cervical c-1)']]),
+                    unlist(deg.list[['Adipose - Visceral (Omentum)']]),
+                    unlist(deg.list[['Artery - Tibial']])),
+             output=T, filename='~/cvd/v8/scripts/venn/deg.png',
+             category.names = c("Caudate", "Spinal Cord","Viseral Adipose", "Tibial Artery"),
+             height=580, width=580, resolution=500, 
+             lwd=1,  col=sapply(myCol, function(x) darken(x)), fill=sapply(myCol, function(x) alpha(x,0.8)),
+             cex=.3, fontfamily="sans", #numbers
+             cat.cex=0.2, 
+             cat.dist = c(0.2, 0.2, 0.1, 0.1),
+             cat.col = sapply(myCol, function(x) darken(x,1.6)) #names
+             
+)
+
+```
+
+
+
+
+### Save
+```{r}
+saveRDS(deg.list, file=file.path(res.dir,'noRACE', 'sig.deg.rds'))
+```
+
+
+
