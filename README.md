@@ -25,7 +25,7 @@ Cerebrovascular disease (CVD) remains one of the global leading causes of disabi
 	- Linear mixed model: `Y ~ Sex + Ischemic time + Age + Batch + Hardy + MHCVD`
 
 ## Functional Enrichment Analysis
-- Pre-ranked gene set enrichment analysis using GSEA: [`run.gsea.Rmd`](gsea/run.gsea.Rmd)
+- Pre-ranked gene set enrichment analysis using GSEA: [`run.prerankedGSEA.sh`](gsea/run.prerankedGSEA.sh)
 	- Genes were ranked by absolute _t_-statistics from limma results
 	- `gmt` files were processed from annotation files of various databases
 
