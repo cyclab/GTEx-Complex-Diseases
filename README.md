@@ -1,5 +1,7 @@
 # GTEx-CVD
 
+> The draft (still being updated) in Google doc: https://docs.google.com/document/d/1rU3ggB-SL6WuUdwHuMr5et3Z9AX2gwaaG2b0TTl5gSI/edit?usp=sharing
+
 ## Introduction
 Cerebrovascular disease (CVD) remains one of the global leading causes of disability and mortality. The previous studies had identified various genetic loci associated with stroke. However, genetic variability that contributes to susceptibility to these diseases and the mechanism underlying CVD largely remain to be explored. Here, we aimed to investigate the effects of having CVD medical history on the molecular signature of human tissues using GTEx RNA-seq data.
 
