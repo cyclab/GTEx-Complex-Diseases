@@ -5,10 +5,11 @@ Cerebrovascular disease (CVD) remains one of the global leading causes of disabi
 
 ## Data exploration
 
-- Comparison of the sample numbers between v6 and v8 releases: `comp.v6.v8.Rmd`
-- Information about subjects and samples: `cohortDemography.Rmd`
-- Principal Coordinates Analysis (PCoA) of tissues: `PCoA.Rmd` 
-- Comparison of tissue-aware normalization methods: `normalization.Rmd`
+- Comparison of the sample numbers between v6 and v8 releases: [`comp.v6.v8.Rmd`](exploration/comp.v6.v8.Rmd)
+- Information about subjects and samples: [`cohortDemography.Rmd`](exploration/cohortDemography.Rmd)
+- Principal Coordinates Analysis (PCoA) of tissues: [`PCoA.Rmd`](exploration/PCoA.Rmd) 
+	- PCoA is used to determine which tissues can be merged into a group based on similarities, but then we determined _not_ to merge tissues
+- Comparison of tissue-aware normalization methods: [`normalization.Rmd`](exploration/normalization.Rmd)
 	- We decided to use tissue-aware **quantile normalization**
 
 ## RNA-seq analysis
