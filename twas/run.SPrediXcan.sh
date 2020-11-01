@@ -1,25 +1,30 @@
 #!/bin/bash
-cd /home/pclam/tools/twas/
 
-dataDir=/NAS_lab/pclam/gwas
-resDir=/home/pclam/tools/twas/results
+TOOL=/home/pclam/tools/twas/MetaXcan/software
+MODELDIR=/home/pclam/tools/twas/data/models/elastic_net_models
+GWASDIR=/NAS_lab/pclam/gwas/summary_stats/harmonized_gwas
+RESDIER=/home/pclam/tools/twas/results/cytokines
 
-for data in af
+for DATA in CRP IFNg IL6 MCP1
 do
-  #mkdir ${resDir}/${data}
-  
-  for t in Adipose_Visceral_Omentum Artery_Tibial Brain_Caudate_basal_ganglia Brain_Spinal_cord_cervical_c-1
+  mkdir $RESDIER/$DATA
+  for t in Adipose_Visceral_Omentum Artery_Tibial Brain_Caudate_basal_ganglia Brain_Spinal_cord_cervical_c-1 Brain_Hypothalamus Brain_Putamen Whole_Blood
   do
-    python MetaXcan/software/SPrediXcan.py \
+    python $TOOL/SPrediXcan.py \
       --keep_non_rsid \
-    	--model_db_path data/models/enet/elastic_net_models/en_${t}.db \
-    	--covariance data/models/enet/elastic_net_models/en_${t}.txt.gz \
-      --gwas_file ${dataDir}/${data}/nielsen-thorolfsdottir-willer-NG2018-AFib-gwas-summary-statistics.tbl \
-    	--snp_column rs_dbSNP147 \
-    	--effect_allele_column A2 \
-    	--non_effect_allele_column A1 \
-    	--beta_column Effect_A2 \
-    	--pvalue_column Pvalue \
-    	--output_file ${resDir}/${data}/${data}.en.${t}.csv
+    	--model_db_path $MODELDIR/en_$t.db \
+    	--covariance $MODELDIR/en_$t.txt.gz \
+      --gwas_file $GWASDIR/$DATA.harmonised.txt.gz \
+    	--snp_column variant_id \
+    	--chromosome_column chromosome \
+    	--position_column position \
+    	--effect_allele_column effect_allele \
+    	--non_effect_allele_column non_effect_allele \
+    	--freq_column frequency \
+    	--se_column standard_error \
+    	--zscore_column zscore \
+    	--beta_column effect_size \
+    	--pvalue_column pvalue \
+    	--output_file $RESDIER/$DATA/$DATA.en.$t.csv
   done
 done
