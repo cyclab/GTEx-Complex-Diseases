@@ -1,0 +1,140 @@
+---
+title: "Plots of MDD DEGs"
+author: "Chi-Lam Poon"
+date: "10/18/2020"
+output: html_document
+---
+
+
+For drawing plots.
+
+```{r setup}
+suppressPackageStartupMessages({
+  library(purrr)
+  library(dplyr)
+  library(knitr)
+  library(ggplot2)
+  library(ggpubr)
+  library(reshape2)
+  library(Biobase)
+})
+```
+
+
+### Load data
+```{r load}
+res.dir <- '~/cvd/v8/results/new/mdd'
+```
+
+
+```{r tissue-list}
+tissues <- c("Adipose - Subcutaneous", "Muscle - Skeletal", "Artery - Tibial", "Artery - Coronary", "Heart - Atrial Appendage",
+             "Adipose - Visceral (Omentum)", "Uterus", "Vagina", "Breast - Mammary Tissue", "Skin - Not Sun Exposed (Suprapubic)",
+             "Minor Salivary Gland", "Brain - Cortex", "Adrenal Gland", "Thyroid", "Lung", "Spleen", "Pancreas", "Esophagus - Muscularis",
+             "Esophagus - Mucosa", "Esophagus - Gastroesophageal Junction", "Stomach", "Colon - Sigmoid", "Small Intestine - Terminal Ileum",
+             "Colon - Transverse", "Prostate", "Testis", "Nerve - Tibial", "Skin - Sun Exposed (Lower leg)", "Heart - Left Ventricle", 
+             "Brain - Cerebellum", "Whole Blood", "Artery - Aorta", "Pituitary", "Brain - Frontal Cortex (BA9)",
+             "Brain - Caudate (basal ganglia)", "Brain - Nucleus accumbens (basal ganglia)", "Brain - Putamen (basal ganglia)",
+             "Brain - Hypothalamus", "Brain - Spinal cord (cervical c-1)", "Brain - Hippocampus",
+             "Brain - Anterior cingulate cortex (BA24)", "Ovary", "Brain - Cerebellar Hemisphere", "Liver", "Brain - Substantia nigra")
+
+```
+
+
+### 1. Numbers of DE genes
+```{r}
+table.dir <- file.path(res.dir, 'tables')
+FCthres <- 1.5
+Pthres <- 0.05
+
+# Plot DEG numbers for all tissues
+sc_df <- data.frame(tissue = tissues, total = rep(0, length(tissues)), 
+                    up = rep(0, length(tissues)), down = rep(0, length(tissues)))
+
+for (i in tissues) {
+  tmp <- read.table(file.path(table.dir, paste0(i, ".txt")), sep="\t", header=T)
+  tmp <- tmp[!is.na(tmp$logFC),]
+  sc_df[sc_df$tissue==i,]$total <- nrow(tmp[(tmp$adj.P.Val < Pthres) & (abs(tmp$logFC) > log2(FCthres)),])
+  sc_df[sc_df$tissue==i,]$up <- nrow(tmp[(tmp$adj.P.Val < Pthres) & (tmp$logFC > log2(FCthres)),])
+  sc_df[sc_df$tissue==i,]$down <- nrow(tmp[(tmp$adj.P.Val < Pthres) & (tmp$logFC < -log2(FCthres)),])
+}
+
+sc_df <- sc_df[sc_df$total != 0,]
+sc_df <- sc_df[order(sc_df$tissue),]
+long <- melt(sc_df, id.vars = 'tissue')
+long <- long[long$variable!='total',]
+print(sc_df)
+
+ggplot(data=long, aes(x=tissue, y=value, fill=variable)) +
+  geom_bar(stat="identity", color="black") +
+  scale_x_discrete(limits=rev(sc_df$tissue), labels=rev(gsub("_", " ", sc_df$tissue))) +
+  scale_y_continuous(limits=c(0, 60), expand = c(0.02, 0)) +
+  #geom_text(aes(label=count), vjust=0.25, hjust=-0.3, size=2.7) +
+  labs(title="", x="", y="", fill="") +  scale_fill_manual(labels = c("up-regulated", "down-regulated"),values=c('#5fa778','#cae2d0')) +
+  coord_flip() + theme_classic()
+```
+
+
+### DEG overlap
+
+```{r}
+sel.tissues <- sc_df$tissue
+table.dir <- file.path(res.dir, 'tables')
+
+deg.list <- list()
+for (t in sel.tissues) {
+  tmp <- read.table(file.path(table.dir, paste0(t, ".txt")), sep="\t", header=T)
+  tmp <- tmp[!is.na(tmp$logFC),]
+  
+  deg.list[[t]] <- list()
+  deg.list[[t]][['total']] <- tmp[(tmp$adj.P.Val < Pthres) & (abs(tmp$logFC) > log2(FCthres)),]
+  deg.list[[t]][['up']] <- tmp[(tmp$adj.P.Val < Pthres) & (tmp$logFC > log2(FCthres)),]
+  deg.list[[t]][['down']] <- tmp[(tmp$adj.P.Val < Pthres) & (tmp$logFC < -log2(FCthres)),]
+}
+
+
+## Venn diagrams
+library(venn)
+v.up <- venn(list(`Brain - Hypothalamus`=deg.list[['Brain - Hypothalamus']]$up$ID,
+                  `Brain - Putamen`=deg.list[['Brain - Putamen (basal ganglia)']]$up$ID,
+                  `Whole Blood`=deg.list[['Whole Blood']]$up$ID,
+                  `Brain - Spinal cord`=deg.list[['Brain - Spinal cord (cervical c-1)']]$up$ID),
+                  intersections = T, box = F)
+
+v.down <- venn(list(`Brain - Hypothalamus`=deg.list[['Brain - Hypothalamus']]$down$ID,
+                    `Brain - Putamen`=deg.list[['Brain - Putamen (basal ganglia)']]$down$ID,
+                    `Whole Blood`=deg.list[['Whole Blood']]$down$ID,
+                    `Brain - Spinal cord`=deg.list[['Brain - Spinal cord (cervical c-1)']]$down$ID),
+                    intersections = T, box = F)
+
+v.all <- venn(list(`Brain - Hypothalamus`=deg.list[['Brain - Hypothalamus']]$total$ID,
+                   `Brain - Putamen`=deg.list[['Brain - Putamen (basal ganglia)']]$total$ID,
+                   `Whole Blood`=deg.list[['Whole Blood']]$total$ID,
+                   `Brain - Spinal cord`=deg.list[['Brain - Spinal cord (cervical c-1)']]$total$ID),
+                    intersections = T, box = F)
+```
+
+
+### Comparison of CVD DEGs
+```{r compare, eval=F}
+cvd.deg <- readRDS('~/cvd/v8/results/new/noRACE/sig.deg.rds')
+cvd.deg <- cvd.deg[names(cvd.deg) %in% names(deg.list)]
+for (tissue in names(cvd.deg)) {
+  cvd.genes <- cvd.deg[[tissue]]$total$ID
+  mdd.genes <- deg.list[[tissue]]$total$ID
+  intersect <- intersect(cvd.genes, mdd.genes)
+  if (length(intersect) > 0) {
+    print(paste('Tissue '), tissue, '...')
+    print(intersect)
+  }
+}
+```
+
+Nothing!!!!
+
+### Save
+```{r}
+saveRDS(deg.list, file=file.path(res.dir,'sig.deg.rds'))
+```
+
+

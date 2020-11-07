@@ -1,0 +1,115 @@
+---
+title: "limma-voom MDD"
+author: "Chi-Lam Poon"
+date: "10/18/2020"
+output: html_document
+---
+
+
+
+According to paper [Batch correction evaluation framework using a-priori gene-gene associations: applied to the GTEx dataset](https://bmcbioinformatics.biomedcentral.com/articles/10.1186/s12859-019-2855-9), the linear regression correction method combining ComBat outperformed other methods. We chose to use their linear model including:
+
+- Gender (GENDER)
+- Ischemic time (SMTSISCH)
+- Age (AGE)
+- Experimental batch (SMGEBTCH)
+- Death type (DTHHRDY)
+
+Tissues:
+
+$$Y \sim \beta_1GENDER + \beta_2SMTSISCH + \beta_3AGE + \beta_4SMNABTCHT + \beta_5DTHHRDY + \beta_6MHCVD + \epsilon$$
+
+
+
+
+```{r setup}
+suppressPackageStartupMessages({
+  library(purrr)
+  library(dplyr)
+  library(metap)
+  library(knitr)
+  library(ggplot2)
+  library(ggpubr)
+  library(Biobase)
+})
+
+source("~/cvd/v8/scripts/utils.R")
+```
+
+
+## Load data
+```{r load, eval=T}
+eset <- readRDS('~/cvd/v8/exprs/gtex.mdd.filted.norm.rds')
+dim(eset)
+```
+
+
+
+## Limma-voom
+### Design matrix without RACE
+```{r}
+table_dir_1 <- '~/cvd/v8/results/new/mdd/tables'
+plot_dir_1 <- '~/cvd/v8/results/new/mdd/plots'
+
+### not merge!
+tissues <- as.character(unique(pData(eset)$SMTSD))
+disease <- "mdd1"
+# sex-specific tissues
+oneSexTissues <- c('Testis', 'Ovary', 'Uterus', 'Vagina', 'Prostate')
+# tissues with only one batch
+num <- sapply(tissues, function(x) length(unique(pData(eset)[pData(eset)$SMTSD == x,]$SMNABTCHT)))
+oneBTCHtissues <- names(num[num==1])
+
+for (t in tissues) {
+  try({
+    print(t)
+    # Subset phenotype and expression data
+    sub_eset <- eset[,which(pData(eset)$SMTSD %in% t)]
+    sub_pdata <- pData(sub_eset)
+    sub_exprs <- assayData(sub_eset)[['normalizedMatrix']]
+    
+    # Construct the linear model
+    print("Running limma pipeline...")
+    age    <- as.numeric(sub_pdata$AGE)
+    sex    <- factor(sub_pdata$SEX)
+    batch  <- factor(sub_pdata$SMNABTCHT)
+    mdd    <- factor(sub_pdata$MHDPRSSN)
+    subject<- factor(sub_pdata$SUBJID)
+    hardy  <- factor(as.character(sub_pdata$DTHHRDY))
+    ischtime <- as.numeric(sub_pdata$SMTSISCH)
+  
+    
+    if (t %in% oneSexTissues) {
+      design <- model.matrix(~ age + batch + mdd + hardy + ischtime)
+    } else if (t %in% oneBTCHtissues) {
+      design <- model.matrix(~ sex + age + mdd + hardy + ischtime)
+    } else {
+      design <- model.matrix(~ sex + age + batch + mdd + hardy + ischtime)
+    }
+  
+    
+    # Use voom weighting
+    transformedCounts <- sub_exprs
+    voomOutput <- voomWeightsCustomized(transformedCounts, design)
+  
+    fit <- lmFit(voomOutput, design)
+    fit <- eBayes(fit)
+    gl <- fData(eset)$geneName
+    topTable <- topTable(fit, number=Inf, genelist=gl, coef=disease)
+    
+    # Output reports & plots
+    write.table(topTable, file=sprintf("%s/%s.txt", table_dir_1, t), sep="\t", quote=F)
+    pdf(sprintf("%s/%s.volcanoplot.pdf", plot_dir_1, t))
+      limma::volcanoplot(fit, coef=disease, highlight = 6, names = gl, main = t)
+    dev.off()
+    pdf(sprintf("%s/%s.MAplot.pdf", plot_dir_1, t))
+      limma::plotMA(fit, main = t, coef=disease)
+    dev.off()
+  })
+}
+
+```
+
+
+
+

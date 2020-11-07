@@ -1,0 +1,212 @@
+---
+title: "MHDPRSSN preprocessing"
+author: "Chi-Lam Poon"
+output: html_document
+---
+
+MHDPRSSN means the medical history of depression -- A mood disorder having a clinical course involving one or more episodes of serious psychological depression that last two or more weeks each, do not have intervening episodes of mania or hypomania, and are characterized by a loss of interest or pleasure in almost all activities and by some or all of disturbances of appetite, sleep, or psychomotor functioning, a decrease in energy, difficulties in thinking or making decisions, loss of self-esteem or feelings of guilt, and suicidal thoughts or attempts. (from [here](https://www.ncbi.nlm.nih.gov/projects/gap/cgi-bin/variable.cgi?study_id=phs000424.v8.p2&phv=169145&phd=3910&pha=&pht=2742&phvf=&phdf=&phaf=&phtf=&dssp=1&consent=&temp=1))
+
+
+Similar to MHCVD processing.
+
+Filter genes in a _tissue-aware_ manner. Details see the YARN paper.
+
+
+```{r setup} 
+suppressPackageStartupMessages({
+  library(yarn)
+  library(stringr)
+  library(Biobase)
+  library(dplyr)
+  library(rafalib)
+  library(readr)
+  library(ggplot2)
+  library(ggpubr)
+  library(edgeR)
+})
+```
+
+## Load data
+```{r}
+eset <- readRDS("~/cvd/v8/exprs/gtex.v8.rds")
+dim(eset)
+```
+
+
+## Modify and filter subjects
+
+Criteria:
+
+1. MHDPRSSN was recorded as value `0 (No)`, `1 (Yes)` and `99 (Unknown)`, therefore subjects with `0` or `1` were kept
+2. Remove samples with `NA` Hardy scale values
+3. Remove samples with `NA` ischemic time
+4. Remove samples without batch info.
+
+```{r}
+# filter according to the criteria
+sub.eset <- eset[, which((pData(eset)$MHDPRSSN %in% c(0, 1)) & 
+                           (!is.na(pData(eset)$DTHHRDY)) & 
+                           (!is.na(pData(eset)$SMTSISCH)) &
+                           (pData(eset)$SMNABTCHT != ""))]
+
+dim(sub.eset); length(unique(pData(sub.eset)$SUBJID)); all(rownames(pData(sub.eset)) == colnames(exprs(sub.eset)))
+```
+
+
+## Remove unwanted tissues
+
+Let's see how many samples first.
+```{r, fig.width=14, fig.height=14}
+pdata <- pData(sub.eset)
+pdata$MHDPRSSN <- factor(pdata$MHDPRSSN)
+
+m_count1 <- pdata %>% group_by(MHDPRSSN) %>% summarise(counts = n())
+m_count2 <- pdata %>% group_by(SMTSD, MHDPRSSN) %>% summarise(counts = n())
+
+# replace long names
+# m_count2$our_subtypes <- gsub('adipose visceral \\(omentum\\)', 'adipose visceral', m_count2$our_subtypes)
+# m_count2$our_subtypes <- gsub('esophagus gastroesophageal junction', 'gastroesophageal junction', m_count2$our_subtypes)
+# m_count2$our_subtypes <- gsub('small intestine terminal ileum', 'intestine terminal ileum', m_count2$our_subtypes)
+
+m1 <- ggplot(m_count1, aes(x=MHDPRSSN, y=counts, fill=MHDPRSSN)) + 
+  geom_bar(stat = "identity", color="black") + 
+  geom_text(aes(label=counts), vjust = -0.15, size = 3) +
+  theme_classic() + theme(axis.title.x=element_blank()) + 
+  scale_fill_manual(values = c("#5c7f8a", "#e9cf63")) +
+  theme(axis.title.x=element_blank(),
+        axis.text.x=element_blank(),
+        axis.line.x=element_blank(),
+        axis.ticks.x=element_blank()) + 
+  scale_y_continuous(limits=c(0,16000), breaks=seq(0,16000,by=2000), expand=c(0,0))
+
+m2 <- ggplot(m_count2, aes(x=MHDPRSSN, y=counts, fill=MHDPRSSN)) +
+  geom_bar(stat="identity", color="black") + 
+  geom_text(aes(label=counts), vjust = -0.1, size = 3) + 
+  theme_classic() +
+  theme(axis.title.x=element_blank(),
+        axis.text.x=element_blank(),
+        axis.title.y=element_blank(),
+        axis.line.x=element_blank(),
+        axis.ticks.x=element_blank()) +
+  scale_fill_manual(values = c("#5c7f8a", "#e9cf63")) + 
+  scale_y_continuous(limits=c(0,850)) +
+  facet_wrap(~SMTSD,ncol=4) 
+
+ggarrange(m1, m2, ncol=2, nrow=1, widths=c(1,3), common.legend = T, legend = "right")
+```
+
+
+Exclude following tissues based on sample number (`MHDPRSSN=1` >= 10). Check GTEx [tissue sampling sites](https://gtexportal.org/home/samplingSitePage)
+
+- Cells - Cultured fibroblasts
+- Cells - EBV-transformed lymphocytes
+- Cells - Leukemia cell line (CML)
+- Bladder
+- Brain - Amygdala
+- Cervix - Ectocervix
+- Cervix - Endocervix
+- Fallopian Tube
+- Kidney - Cortex
+- Kidney - Medulla
+
+```{r}
+dim(sub.eset)
+throwTissues <- c('Cells - Cultured fibroblasts', 'Cells - EBV-transformed lymphocytes', 'Cells - Leukemia cell line (CML)', 'Cervix - Ectocervix', 'Cervix - Endocervix', 'Bladder', 'Fallopian Tube', 'Kidney - Cortex', 'Kidney - Medulla', 'Brain - Amygdala')
+
+sub.eset2 <- sub.eset[, which(!pData(sub.eset)$SMTSD %in% throwTissues)]
+dim(sub.eset2); all(rownames(pData(sub.eset2))==colnames(exprs(sub.eset2)))
+```
+
+
+
+## View the samples again
+MHDPRSSN in v8!
+```{R ndpr, fig.width=12, fig.height=12}
+table(pData(sub.eset2)$MHDPRSSN)
+pData(sub.eset2)$MHDPRSSN <- factor(pData(sub.eset2)$MHDPRSSN)
+
+m_count1 <- pData(sub.eset2) %>% group_by(MHDPRSSN) %>% summarise(counts = n())
+m_count2 <- pData(sub.eset2) %>% group_by(SMTSD, MHDPRSSN) %>% summarise(counts = n())
+
+# remove parentheses and contents within
+m_count2$SMTSD <- gsub("\\s*\\([^\\)]+\\)", "", as.character(m_count2$SMTSD))
+
+m1 <- ggplot(m_count1, aes(x=MHDPRSSN, y=counts, fill=MHDPRSSN)) + 
+  geom_bar(stat = "identity", color="black") + 
+  geom_text(aes(label=counts), vjust = -0.15, size = 3) +
+  theme_classic() + theme(axis.title.x=element_blank()) + 
+  scale_fill_manual(values = c("#5c7f8a", "#e9cf63")) +
+  theme(axis.title.x=element_blank(),
+        axis.text.x=element_blank(),
+        axis.line.x=element_blank(),
+        axis.ticks.x=element_blank()) + 
+  scale_y_continuous(limits=c(0,16000), breaks=seq(0,16000,by=2000), expand=c(0,0))
+
+m2 <- ggplot(m_count2, aes(x=MHDPRSSN, y=counts, fill=MHDPRSSN)) +
+  geom_bar(stat="identity", color="black") + 
+  geom_text(aes(label=counts), vjust = -0.1, size = 3) + 
+  theme_classic() +
+  theme(axis.title.x=element_blank(),
+        axis.text.x=element_blank(),
+        axis.title.y=element_blank(),
+        axis.line.x=element_blank(),
+        axis.ticks.x=element_blank()) +
+  scale_fill_manual(values = c("#5c7f8a", "#e9cf63")) + 
+  scale_y_continuous(limits=c(0,830)) +
+  facet_wrap(~SMTSD, ncol=4)
+
+ggarrange(m1, m2, ncol=2, nrow=1, widths=c(1,3), common.legend = T, legend = "right")
+```
+
+
+## Filter genes
+Need to filter out some lowly-expressed genes.
+
+### Remove those were 0 across all samples
+```{r}
+for (i in 1:nrow(problems(exprs(sub.eset2)))) {
+  exprs(sub.eset2)[problems(exprs(sub.eset2))$row[i], problems(exprs(sub.eset2))$col[i]] <- 1e+05
+}
+throwAway <- which(rowSums(exprs(sub.eset2)) == 0) # 326
+sub.eset3 <- sub.eset2[-throwAway, ]
+rm(sub.eset, sub.eset2)
+```
+
+
+### Detele Y genes
+```{r}
+sub.eset4 <- sub.eset3[which(fData(sub.eset3)$chr != 'Y'),] # 500 genes
+```
+
+
+### Filter genes in a tissue-aware manner
+Genes < 1 CPM in fewer than half of the number of samples of the smallest set of related samples are **out**.
+```{r}
+pData(sub.eset4)$SMTSD <- factor(pData(sub.eset4)$SMTSD)
+minSamples <- min(table(pData(sub.eset4)$SMTSD))
+minSamples <- floor(minSamples / 2)
+counts <- cpm(exprs(sub.eset4))
+keep <- rowSums(counts > 1) >= minSamples
+sum(keep)
+sub.eset5 <- sub.eset4[keep,]
+dim(sub.eset5)
+rm(sub.eset3, sub.eset4)
+```
+
+## Tissue-aware quantile normalization
+
+```{r norm}
+source('~/cvd/v8/scripts/tissueAwareNorm.R')
+normalizedMatrix <- tissue.aware.norm(sub.eset5, "SMTSD", 'QN')
+all(colnames(normalizedMatrix)==rownames(pData(sub.eset5)))
+storageMode(sub.eset5) <- "environment"
+assayData(sub.eset5)[["normalizedMatrix"]] <- normalizedMatrix
+storageMode(sub.eset5) <- "lockedEnvironment"
+```
+
+
+## Save data
+```{r, eval=T}
+saveRDS(sub.eset5, file='~/cvd/v8/exprs/gtex.mdd.filted.norm.rds')
+```
+
