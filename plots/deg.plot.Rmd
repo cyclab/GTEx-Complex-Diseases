@@ -59,9 +59,9 @@ print(sc_df)
 ggplot(data=long, aes(x=tissue, y=value, fill=variable)) +
   geom_bar(stat="identity", color="black") +
   scale_x_discrete(limits=rev(sc_df$tissue), labels=rev(gsub("_", " ", sc_df$tissue))) +
-  scale_y_continuous(limits=c(0, 800), expand = c(0.02, 0)) +
+  scale_y_continuous(limits=c(0, 600), expand = c(0.02, 0)) +
   #geom_text(aes(label=count), vjust=0.25, hjust=-0.3, size=2.7) +
-  labs(title="", x="", y="", fill="") +  scale_fill_manual(labels = c("up-regulated", "down-regulated"),values=c('#2d93af','#8fd7e2')) +
+  labs(title="", x="", y="", fill="MHCVD") +  scale_fill_manual(labels = c("up-regulated", "down-regulated"),values=c('#2d93af','#8fd7e2')) +
   coord_flip() + theme_classic()
 ```
 
@@ -96,7 +96,7 @@ ggplot(data=long, aes(x=tissue, y=value, fill=variable)) +
   scale_x_discrete(limits=rev(sc_df$tissue), labels=rev(gsub("_", " ", sc_df$tissue))) +
   scale_y_continuous(limits=c(0, 800), expand = c(0.02, 0)) +
   #geom_text(aes(label=count), vjust=0.25, hjust=-0.3, size=2.7) +
-  labs(title="", x="", y="", fill="") +  scale_fill_manual(labels = c("up-regulated", "down-regulated"),values=c('#2d93af','#8fd7e2')) +
+  labs(title="", x="", y="", fill="MHCVD") +  scale_fill_manual(labels = c("up-regulated", "down-regulated"),values=c('#2d93af','#8fd7e2')) +
   coord_flip() + theme_classic()
 ```
 
@@ -153,10 +153,7 @@ dens.plot(assayData(sort.eset)[['normalizedMatrix']], colVector, ylim=c(0,0.3), 
 ### DEG overlap
 
 ```{r}
-sel.tissues <- c('Adipose - Visceral (Omentum)',
-                 'Artery - Tibial',
-                 'Brain - Caudate (basal ganglia)',
-                 'Brain - Spinal cord (cervical c-1)')
+sel.tissues <- sc_df$tissue
 table.dir <- file.path(noR.dir, 'tables')
 
 deg.list <- list()
@@ -165,35 +162,47 @@ for (t in sel.tissues) {
   tmp <- tmp[!is.na(tmp$logFC),]
   
   deg.list[[t]] <- list()
-  deg.list[[t]][['up']] <- as.character(tmp[(tmp$adj.P.Val < Pthres) & (tmp$logFC > log2(FCthres)),]$ID)
-  deg.list[[t]][['down']] <- as.character(tmp[(tmp$adj.P.Val < Pthres) & (tmp$logFC < -log2(FCthres)),]$ID)
+  deg.list[[t]][['total']] <- tmp[(tmp$adj.P.Val < Pthres) & (abs(tmp$logFC) > log2(FCthres)),]
+  deg.list[[t]][['up']] <- tmp[(tmp$adj.P.Val < Pthres) & (tmp$logFC > log2(FCthres)),]
+  deg.list[[t]][['down']] <- tmp[(tmp$adj.P.Val < Pthres) & (tmp$logFC < -log2(FCthres)),]
 }
 
 
 ## Venn diagrams
 library(venn)
-v.up <- venn(list(`Viseral Adipose`=deg.list[['Adipose - Visceral (Omentum)']]$up,
-                  `Tibial Artery`=deg.list[['Artery - Tibial']]$up,
-             `Caudate`=deg.list[['Brain - Caudate (basal ganglia)']]$up,
-             `Spinal Cord`=deg.list[['Brain - Spinal cord (cervical c-1)']]$up),
+v.up <- venn(list(`Adipose - Visceral`=deg.list[['Adipose - Visceral (Omentum)']][["up"]][["ID"]],
+                  `Artery - Tibial`=deg.list[['Artery - Tibial']][["up"]][["ID"]],
+             `Brain - Caudate`=deg.list[['Brain - Caudate (basal ganglia)']][["up"]][["ID"]],
+             `Brain - Spinal cord`=deg.list[['Brain - Spinal cord (cervical c-1)']][["up"]][["ID"]]),
              intersections = T, box = F)
 
-v.down <- venn(list(`Viseral Adipose`=deg.list[['Adipose - Visceral (Omentum)']]$down,
-                  `Tibial Artery`=deg.list[['Artery - Tibial']]$down,
-             `Caudate`=deg.list[['Brain - Caudate (basal ganglia)']]$down,
-             `Spinal Cord`=deg.list[['Brain - Spinal cord (cervical c-1)']]$down),
+v.down <- venn(list(`Adipose - Visceral`=deg.list[['Adipose - Visceral (Omentum)']][["down"]][["ID"]],
+                  `Artery - Tibial`=deg.list[['Artery - Tibial']][["down"]][["ID"]],
+             `Brain - Caudate`=deg.list[['Brain - Caudate (basal ganglia)']][["down"]][["ID"]],
+             `Brain - Spinal cord`=deg.list[['Brain - Spinal cord (cervical c-1)']][["down"]][["ID"]]),
              intersections = T, box = F)
 
-v.all <- venn(list(`Viseral Adipose`=unlist(deg.list[['Adipose - Visceral (Omentum)']]),
-                `Tibial Artery`=unlist(deg.list[['Artery - Tibial']]),
-             `Caudate`=unlist(deg.list[['Brain - Caudate (basal ganglia)']]),
-             `Spinal Cord`=unlist(deg.list[['Brain - Spinal cord (cervical c-1)']])),
-             intersections = T, box = F)
+v.all <- venn(list(`Adipose - Visceral`=deg.list[['Adipose - Visceral (Omentum)']]$total$ID,
+                `Artery - Tibial`=deg.list[['Artery - Tibial']]$total$ID,
+             `Brain - Caudate`=deg.list[['Brain - Caudate (basal ganglia)']]$total$ID,
+             `Brain - Spinal cord`=deg.list[['Brain - Spinal cord (cervical c-1)']]$total$ID),
+             intersections = T, box = F, zcol=c("#9efd38", "#afafaf","#a690ff","#1188cc"))
 
 ```
 
+### Intersection
+```{r exact genes}
+attr(v.all, "intersection")$`Brain - Caudate:Brain - Spinal cord`
+attr(v.all, "intersection")$`Artery - Tibial:Brain - Spinal cord`
+attr(v.all, "intersection")$`Adipose - Visceral:Brain - Spinal cord`
+attr(v.all, "intersection")$`Adipose - Visceral:Artery - Tibial`
+attr(v.all, "intersection")$`Artery - Tibial:Brain - Caudate:Brain - Spinal cord`
+```
+
+
 ### Colorful venn
-```{r colorVenn}
+Won't run
+```{r colorVenn, eval=F}
 library(VennDiagram)
 
 library(RColorBrewer)
@@ -209,7 +218,7 @@ venn.diagram(x=list(unlist(deg.list[['Brain - Caudate (basal ganglia)']]),
                     unlist(deg.list[['Brain - Spinal cord (cervical c-1)']]),
                     unlist(deg.list[['Adipose - Visceral (Omentum)']]),
                     unlist(deg.list[['Artery - Tibial']])),
-             output=T, filename='~/cvd/v8/scripts/venn/deg.png',
+             output=F, filename='/home/pclam/cvd/v8/scripts/venn/deg.png',
              category.names = c("Caudate", "Spinal Cord","Viseral Adipose", "Tibial Artery"),
              height=580, width=580, resolution=500, 
              lwd=1,  col=sapply(myCol, function(x) darken(x)), fill=sapply(myCol, function(x) alpha(x,0.8)),
@@ -223,12 +232,9 @@ venn.diagram(x=list(unlist(deg.list[['Brain - Caudate (basal ganglia)']]),
 ```
 
 
-
-
 ### Save
 ```{r}
 saveRDS(deg.list, file=file.path(res.dir,'noRACE', 'sig.deg.rds'))
 ```
-
 
 

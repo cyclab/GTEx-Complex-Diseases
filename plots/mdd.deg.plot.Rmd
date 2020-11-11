@@ -26,7 +26,7 @@ suppressPackageStartupMessages({
 res.dir <- '~/cvd/v8/results/new/mdd'
 ```
 
-
+All tissue names:
 ```{r tissue-list}
 tissues <- c("Adipose - Subcutaneous", "Muscle - Skeletal", "Artery - Tibial", "Artery - Coronary", "Heart - Atrial Appendage",
              "Adipose - Visceral (Omentum)", "Uterus", "Vagina", "Breast - Mammary Tissue", "Skin - Not Sun Exposed (Suprapubic)",
@@ -37,7 +37,6 @@ tissues <- c("Adipose - Subcutaneous", "Muscle - Skeletal", "Artery - Tibial", "
              "Brain - Caudate (basal ganglia)", "Brain - Nucleus accumbens (basal ganglia)", "Brain - Putamen (basal ganglia)",
              "Brain - Hypothalamus", "Brain - Spinal cord (cervical c-1)", "Brain - Hippocampus",
              "Brain - Anterior cingulate cortex (BA24)", "Ovary", "Brain - Cerebellar Hemisphere", "Liver", "Brain - Substantia nigra")
-
 ```
 
 
@@ -70,7 +69,7 @@ ggplot(data=long, aes(x=tissue, y=value, fill=variable)) +
   scale_x_discrete(limits=rev(sc_df$tissue), labels=rev(gsub("_", " ", sc_df$tissue))) +
   scale_y_continuous(limits=c(0, 60), expand = c(0.02, 0)) +
   #geom_text(aes(label=count), vjust=0.25, hjust=-0.3, size=2.7) +
-  labs(title="", x="", y="", fill="") +  scale_fill_manual(labels = c("up-regulated", "down-regulated"),values=c('#5fa778','#cae2d0')) +
+  labs(title="", x="", y="", fill="MHDPRSSN") +  scale_fill_manual(labels = c("up-regulated", "down-regulated"),values=c('#5fa778','#cae2d0')) +
   coord_flip() + theme_classic()
 ```
 
@@ -106,13 +105,31 @@ v.down <- venn(list(`Brain - Hypothalamus`=deg.list[['Brain - Hypothalamus']]$do
                     `Whole Blood`=deg.list[['Whole Blood']]$down$ID,
                     `Brain - Spinal cord`=deg.list[['Brain - Spinal cord (cervical c-1)']]$down$ID),
                     intersections = T, box = F)
-
 v.all <- venn(list(`Brain - Hypothalamus`=deg.list[['Brain - Hypothalamus']]$total$ID,
                    `Brain - Putamen`=deg.list[['Brain - Putamen (basal ganglia)']]$total$ID,
-                   `Whole Blood`=deg.list[['Whole Blood']]$total$ID,
                    `Brain - Spinal cord`=deg.list[['Brain - Spinal cord (cervical c-1)']]$total$ID),
-                    intersections = T, box = F)
+                    intersections = T, box = F, zcol = "#ffdd77, #bb2020, #1188cc")
 ```
+
+
+Try `eulerr` package:
+```{r}
+library(eulerr)
+wanted <- c('Brain - Hypothalamus', 'Brain - Putamen (basal ganglia)', 'Brain - Spinal cord (cervical c-1)')
+length(deg.list[[wanted[1]]]$total$ID); length(deg.list[[wanted[2]]]$total$ID)
+length(deg.list[[wanted[3]]]$total$ID)
+intersect(deg.list[[wanted[1]]]$total$ID, deg.list[[wanted[2]]]$total$ID)
+intersect(deg.list[[wanted[1]]]$total$ID, deg.list[[wanted[3]]]$total$ID)
+intersect(deg.list[[wanted[2]]]$total$ID, deg.list[[wanted[3]]]$total$ID)
+intersect(deg.list[[wanted[1]]]$total$ID, intersect(deg.list[[wanted[2]]]$total$ID, deg.list[[wanted[3]]]$total$ID))
+eulerr.vec <- c("Brain - Hypothalamus" = 53, "Brain - Putamen" = 28, "Brain - Spinal cord" = 14, 
+                "Brain - Hypothalamus&Brain - Putamen"=0, "Brain - Putamen&Brain - Spinal cord"=0,
+                "Brain - Hypothalamus&Brain - Spinal cord"=0,"Brain - Hypothalamus&Brain - Putamen&Brain - Spinal cord"=0
+                )                                                                                           
+fit <- euler(eulerr.vec, shape = "ellipse")
+plot(fit, opacity = .7, quantities = TRUE, lwd = 1)
+```
+Hmmm not good
 
 
 ### Comparison of CVD DEGs
