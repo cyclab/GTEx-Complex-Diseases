@@ -35,7 +35,7 @@ Although lots of technologies and strategies can be used to identify genetic fac
 Gene expression variation was inferred from several public GWAS summary statistics using [S-PrediXcan](https://github.com/hakyimlab/MetaXcan) software for tissues with expression differences between CVD & non-CVD cohorts. Genes that have significant associations were compared to the differentially expressed genes from limma-voom. The code sees [here](twas/).
 
 ## Plots
-- Plots for differentially expressed genes: [`deg.plot.Rmd`](plots/deg.plot.Rmd), [`dprssn.deg.plot.Rmd`](plots/dprssn.deg.plot.Rmd)
+- Plots for differentially expressed genes: [`cvd.deg.plot.Rmd`](plots/cvd.deg.plot.Rmd), [`dprssn.deg.plot.Rmd`](plots/dprssn.deg.plot.Rmd)
 - Plots for enriched pathways: [`pathway.plot.Rmd`](plots/pathway.plot.Rmd)
 
 ## Notes
