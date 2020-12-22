@@ -40,10 +40,10 @@ m_count2 <- pdata %>% group_by(SMTSD, MHCVD) %>% summarise(counts = n())
 m_count2$SMTSD <- gsub("\\s*\\([^\\)]+\\)", "", as.character(m_count2$SMTSD))
 
 m1 <- ggplot(m_count1, aes(x=MHCVD, y=counts, fill=MHCVD)) + 
-  geom_bar(stat = "identity", color="black") + 
-  geom_text(aes(label=counts), vjust = -0.15, size = 3) +
+  geom_bar(stat = "identity") + 
+  geom_text(aes(label=counts), vjust = -0.17, size = 3.5) +
   theme_classic() + theme(axis.title.x=element_blank()) + 
-  scale_fill_manual(values = c("#1aa398", "#ffb353")) +
+  scale_fill_manual(values = c("#645d6f", "#efdfbb")) +
   theme(axis.title.x=element_blank(),
         axis.text.x=element_blank(),
         axis.line.x=element_blank(),
@@ -51,15 +51,15 @@ m1 <- ggplot(m_count1, aes(x=MHCVD, y=counts, fill=MHCVD)) +
   scale_y_continuous(limits=c(0,16000), breaks=seq(0,16000,by=2000), expand=c(0,0))
 
 m2 <- ggplot(m_count2, aes(x=MHCVD, y=counts, fill=MHCVD)) +
-  geom_bar(stat="identity", color="black") + 
-  geom_text(aes(label=counts), vjust = -0.1, size = 3) + 
+  geom_bar(stat="identity") + 
+  geom_text(aes(label=counts), vjust = -0.14, size = 3.5) + 
   theme_classic() +
   theme(axis.title.x=element_blank(),
         axis.text.x=element_blank(),
         axis.title.y=element_blank(),
         axis.line.x=element_blank(),
         axis.ticks.x=element_blank()) +
-  scale_fill_manual(values = c("#1aa398", "#ffb353")) + 
+  scale_fill_manual(values = c("#645d6f", "#efdfbb")) + 
   scale_y_continuous(limits=c(0,800)) +
   facet_wrap(~SMTSD, ncol=4)
 

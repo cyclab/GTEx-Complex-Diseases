@@ -69,10 +69,10 @@ m_count2 <- pdata %>% group_by(SMTSD, MHDPRSSN) %>% summarise(counts = n())
 # m_count2$our_subtypes <- gsub('small intestine terminal ileum', 'intestine terminal ileum', m_count2$our_subtypes)
 
 m1 <- ggplot(m_count1, aes(x=MHDPRSSN, y=counts, fill=MHDPRSSN)) + 
-  geom_bar(stat = "identity", color="black") + 
-  geom_text(aes(label=counts), vjust = -0.15, size = 3) +
+  geom_bar(stat = "identity") + 
+  geom_text(aes(label=counts), vjust = -0.17, size = 3.5) +
   theme_classic() + theme(axis.title.x=element_blank()) + 
-  scale_fill_manual(values = c("#5c7f8a", "#e9cf63")) +
+  scale_fill_manual(values = c("#446780", "#ADEFD1FF")) +
   theme(axis.title.x=element_blank(),
         axis.text.x=element_blank(),
         axis.line.x=element_blank(),
@@ -80,17 +80,17 @@ m1 <- ggplot(m_count1, aes(x=MHDPRSSN, y=counts, fill=MHDPRSSN)) +
   scale_y_continuous(limits=c(0,16000), breaks=seq(0,16000,by=2000), expand=c(0,0))
 
 m2 <- ggplot(m_count2, aes(x=MHDPRSSN, y=counts, fill=MHDPRSSN)) +
-  geom_bar(stat="identity", color="black") + 
-  geom_text(aes(label=counts), vjust = -0.1, size = 3) + 
+  geom_bar(stat="identity") + 
+  geom_text(aes(label=counts), vjust = -0.14, size = 3.5) + 
   theme_classic() +
   theme(axis.title.x=element_blank(),
         axis.text.x=element_blank(),
         axis.title.y=element_blank(),
         axis.line.x=element_blank(),
         axis.ticks.x=element_blank()) +
-  scale_fill_manual(values = c("#5c7f8a", "#e9cf63")) + 
-  scale_y_continuous(limits=c(0,850)) +
-  facet_wrap(~SMTSD,ncol=4) 
+  scale_fill_manual(values = c("#446780", "#ADEFD1FF")) + 
+  scale_y_continuous(limits=c(0,830)) +
+  facet_wrap(~SMTSD, ncol=4)
 
 ggarrange(m1, m2, ncol=2, nrow=1, widths=c(1,3), common.legend = T, legend = "right")
 ```
@@ -132,10 +132,10 @@ m_count2 <- pData(sub.eset2) %>% group_by(SMTSD, MHDPRSSN) %>% summarise(counts 
 m_count2$SMTSD <- gsub("\\s*\\([^\\)]+\\)", "", as.character(m_count2$SMTSD))
 
 m1 <- ggplot(m_count1, aes(x=MHDPRSSN, y=counts, fill=MHDPRSSN)) + 
-  geom_bar(stat = "identity", color="black") + 
-  geom_text(aes(label=counts), vjust = -0.15, size = 3) +
+  geom_bar(stat = "identity") + 
+  geom_text(aes(label=counts), vjust = -0.17, size = 3.5) +
   theme_classic() + theme(axis.title.x=element_blank()) + 
-  scale_fill_manual(values = c("#5c7f8a", "#e9cf63")) +
+  scale_fill_manual(values = c("#446780", "#ADEFD1FF")) +
   theme(axis.title.x=element_blank(),
         axis.text.x=element_blank(),
         axis.line.x=element_blank(),
@@ -143,15 +143,15 @@ m1 <- ggplot(m_count1, aes(x=MHDPRSSN, y=counts, fill=MHDPRSSN)) +
   scale_y_continuous(limits=c(0,16000), breaks=seq(0,16000,by=2000), expand=c(0,0))
 
 m2 <- ggplot(m_count2, aes(x=MHDPRSSN, y=counts, fill=MHDPRSSN)) +
-  geom_bar(stat="identity", color="black") + 
-  geom_text(aes(label=counts), vjust = -0.1, size = 3) + 
+  geom_bar(stat="identity") + 
+  geom_text(aes(label=counts), vjust = -0.14, size = 3.5) + 
   theme_classic() +
   theme(axis.title.x=element_blank(),
         axis.text.x=element_blank(),
         axis.title.y=element_blank(),
         axis.line.x=element_blank(),
         axis.ticks.x=element_blank()) +
-  scale_fill_manual(values = c("#5c7f8a", "#e9cf63")) + 
+  scale_fill_manual(values = c("#446780", "#ADEFD1FF")) + 
   scale_y_continuous(limits=c(0,830)) +
   facet_wrap(~SMTSD, ncol=4)
 
