@@ -1,7 +1,7 @@
 # GTEx-Medical-History
 
 ## Introduction
-Although lots of technologies and strategies can be used to identify genetic factors of human complex diseases, results from these studies are still hard to decipher since complex diseases are "complex" and multifactorial. Inflammation has recently been associated with many complex diseases and may cause long-term damage to the human body. Here we examined whether the history of complex disease systematically alternated human tissue transcriptomes and whether inflammation is enriched in identified molecular signatures, using postmortem samples from the Genotype-Tissue Expression (GTEx) project. We compared expression profiles between subject with and without the medical history of cerebrovascular disease (CVD) or major depression (MD), more details see our manuscript.
+Although lots of technologies and strategies can be used to identify genetic factors of human complex diseases, results from these studies are still hard to decipher since complex diseases are "complex" and multifactorial. Inflammation has recently been associated with many complex diseases and may cause long-term damage to the human body. Here we examined whether the history of complex disease systematically altered human tissue transcriptomes and whether inflammation is enriched in identified molecular signatures, using postmortem samples from the Genotype-Tissue Expression (GTEx) project. We compared expression profiles between subjects with and without the medical history of cerebrovascular disease (CVD) or major depression (MD), more details see our manuscript.
 
 ## Data Exploration
 - Comparison of the sample numbers between v6 and v8 releases: [`comp.v6.v8.Rmd`](exploration/comp.v6.v8.Rmd)
