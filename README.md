@@ -32,7 +32,7 @@ Although lots of technologies and strategies can be used to identify genetic fac
 	- `gmt` files were processed from annotation files of various databases
 
 ## Transcriptome-Wide Association Study
-Gene expression variation was inferred from several public GWAS summary statistics using [S-PrediXcan](https://github.com/hakyimlab/MetaXcan) software for tissues with expression differences between CVD & non-CVD cohorts. Genes that have significant associations were compared to the differentially expressed genes from limma-voom. The code sees [here](twas/).
+Gene expression variation was inferred from several public GWAS summary statistics using [S-PrediXcan](https://github.com/hakyimlab/MetaXcan) software for tissues with expression differences between CVD & non-CVD or MD & non-MD cohorts. Genes that have significant associations were compared to the differentially expressed genes from limma-voom. The code sees [here](twas/).
 
 ## Plots
 - Plots for differentially expressed genes: [`cvd.deg.plot.Rmd`](plots/cvd.deg.plot.Rmd), [`dprssn.deg.plot.Rmd`](plots/dprssn.deg.plot.Rmd)
