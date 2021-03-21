@@ -101,7 +101,7 @@ colors <- getColors(sub.p$SMTSD)
 
 mypar(3, 3)
 for (method in methods) {
-  print(dens.plot(dist.list[[method]][,match(rownames(sub.p), colnames(dist.list[[method]]))], colVector, ylim=c(0, 0.3), main=method))
+  print(dens.plot(dist.list[[method]][,match(rownames(sub.p), colnames(dist.list[[method]]))], colors, ylim=c(0, 0.3), main=method))
 }
 ```
 
