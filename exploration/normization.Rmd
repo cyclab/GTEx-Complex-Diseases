@@ -80,8 +80,8 @@ getColors <- function(vec) {
 }
 
 
-dens.plot <- function(table, colVec, ...) {
-  cols <- names(colVec)
+dens.plot <- function(table, colors, ...) {
+  cols <- names(colors)
   d <- plot(density(table[, 1]), col=cols[1], 
             lwd=2, las=2, xlab="", ...) +
     abline(v=0, lty=3) + title(xlab="log2 exprs", ylab=NA) +
@@ -89,7 +89,7 @@ dens.plot <- function(table, colVec, ...) {
       den <- density(table[, i])
       lines(den$x, den$y, col=cols[i], lwd=2)
     } 
-  legend('topright', legend=unique(colVector), lty=1, col=unique(names(colVector)), cex=0.6)
+  legend('topright', legend=unique(colors), lty=1, col=unique(names(colors)), cex=0.6)
   d
 }
 
@@ -97,7 +97,7 @@ dens.plot <- function(table, colVec, ...) {
 sub.p <- pData(seset)
 sub.p$SMTSD <- factor(sub.p$SMTSD)
 sub.p <- sub.p[order(sub.p$SMTSD),]
-colVector <- getColors(sub.p$SMTSD)
+colors <- getColors(sub.p$SMTSD)
 
 mypar(3, 3)
 for (method in methods) {
