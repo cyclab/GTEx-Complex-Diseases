@@ -65,11 +65,12 @@ long <- long[long$variable!='total',]
 print(sc_df)
 
 ggplot(data=long, aes(x=tissue, y=value, fill=variable)) +
-  geom_bar(stat="identity") +
+  geom_bar(stat="identity", position="dodge") +
   scale_x_discrete(limits=rev(sc_df$tissue), labels=rev(gsub("_", " ", sc_df$tissue))) +
-  scale_y_continuous(limits=c(0, 60), expand = c(0.02, 0)) +
-  #geom_text(aes(label=count), vjust=0.25, hjust=-0.3, size=2.7) +
-  labs(title="", x="", y="", fill="MD") +  scale_fill_manual(labels = c("Up", "Down"),values=c('#4983a2','#d0e6df')) +
+  scale_y_continuous(limits=c(0, 50), expand = c(0.02, 0)) +
+  geom_text(position = position_dodge(width= 0.9), aes(y=value, label=value, hjust=-0.2), size=2.7) +
+  labs(title="Major Depression", x="", y="", fill=" ") +  
+  scale_fill_manual(labels = c("Up", "Down"),values=c('#4983a2','#d0e6df')) +
   coord_flip() + theme_classic()
 ```
 
