@@ -1,7 +1,7 @@
 # GTEx-Complex-Diseases
 
 ## Introduction
-Although lots of technologies and strategies can be used to identify genetic factors of human complex diseases, results from these studies are still hard to decipher since complex diseases are "complex" and multifactorial. Inflammation has recently been associated with many complex diseases and may cause long-term damage to the human body. Here we examined whether the history of complex disease systematically altered human tissue transcriptomes and whether inflammation is enriched in identified molecular signatures, using postmortem samples from the Genotype-Tissue Expression (GTEx) project. We compared expression profiles between subjects with and without the medical history of cerebrovascular disease (CVD) or major depression (MD), more details see our manuscript.
+Although lots of technologies and strategies can be used to identify genetic factors of human complex diseases, results from these studies are still hard to decipher due to the complexity and multifactors of these diseases. Inflammation has recently been associated with many complex diseases and may cause long-term damage to the human body. Here we examined whether the history of complex disease systematically altered human tissue transcriptomes and whether inflammation is linked to molecular signatures identified in our analyses, using postmortem samples from the Genotype-Tissue Expression (GTEx) project. We compared expression profiles between subjects with and without the medical history of cerebrovascular disease (CVD) or major depression (MD), more details see our manuscript.
 
 ## Data Exploration
 - Comparison of the sample numbers between v6 and v8 releases: [`comp.v6.v8.Rmd`](exploration/comp.v6.v8.Rmd)
@@ -39,8 +39,7 @@ Gene expression variation was inferred from several public GWAS summary statisti
 - Plots for enriched pathways: [`pathway.plot.Rmd`](plots/pathway.plot.Rmd)
 
 ## Notes
-Warnings function `lmFit` in limma: if any term in the linear model only has one sample, then there will be a warning: `Warning: Partial NA coefficients for n probe(s)`
+Warnings from function `lmFit`: if any term in the linear model only has one sample, then there will be a warning: `Warning: Partial NA coefficients for n probe(s)`
 
 ## Preprint
 Submitted, under review
-
