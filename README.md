@@ -1,7 +1,7 @@
 # GTEx-Complex-Diseases
 
 ## Introduction
-Although lots of technologies and strategies can be used to identify genetic factors of human complex diseases, results from these studies are still hard to decipher due to the complexity and multifactors of these diseases. Inflammation has recently been associated with many complex diseases and may cause long-term damage to the human body. Here we examined whether the history of complex disease systematically altered human tissue transcriptomes and whether inflammation is linked to molecular signatures identified in our analyses, using postmortem samples from the Genotype-Tissue Expression (GTEx) project. We compared expression profiles between subjects with and without the medical history of cerebrovascular disease (CVD) or major depression (MD), more details see our manuscript.
+Although lots of technologies and strategies can be used to identify genetic factors of human complex diseases, results from these studies are still hard to decipher due to the diseases' complexity and multifactors. Inflammation has recently been associated with many complex diseases and may cause long-term damage to the human body. Here we examined whether the history of complex disease systematically altered human tissue transcriptomes and whether inflammation is linked to identifiable signatures, using over 16,000 postmortem samples from the Genotype-Tissue Expression (GTEx) project. We analyzed expression profiles of subjects with and without a medical history of cerebrovascular disease (CVD) or major depression (MD), more details can be found in our paper.
 
 ## Data Exploration
 - Comparison of the sample numbers between v6 and v8 releases: [`comp.v6.v8.Rmd`](exploration/comp.v6.v8.Rmd)
@@ -41,5 +41,5 @@ Gene expression variation was inferred from several public GWAS summary statisti
 ## Notes
 Warnings from function `lmFit`: if any term in the linear model only has one sample, then there will be a warning: `Warning: Partial NA coefficients for n probe(s)`
 
-## Preprint
-Submitted, under review
+## Publication
+Poon C-L and Chen C-Y (2021) [Exploring the Impact of Cerebrovascular Disease and Major Depression on Non-diseased Human Tissue Transcriptomes](https://www.frontiersin.org/articles/10.3389/fgene.2021.696836/full). Front. Genet. 12:696836. doi: 10.3389/fgene.2021.696836
